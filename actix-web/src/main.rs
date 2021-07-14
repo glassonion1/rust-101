@@ -1,4 +1,4 @@
-use actix_web::{get, web, App, HttpServer, Responder};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -11,6 +11,11 @@ async fn greet(name: web::Path<String>) -> impl Responder {
 struct Person {
     id: String,
     name: String,
+}
+
+#[derive(Serialize, Clone)]
+struct ResponseBody {
+    message: String,
 }
 
 #[get("/people/{id}")]
@@ -26,8 +31,14 @@ async fn person(id: web::Path<String>) -> impl Responder {
     };
     map.insert("1", p1);
     map.insert("2", p2);
+
     let key: &str = &id;
-    web::Json(map[key].clone())
+    match map.get_mut(key) {
+        Some(person) => HttpResponse::Ok().json(person),
+        _ => HttpResponse::NotFound().json(ResponseBody {
+            message: "Data Not Found".to_string(),
+        }),
+    }
 }
 
 #[get("/people")]
