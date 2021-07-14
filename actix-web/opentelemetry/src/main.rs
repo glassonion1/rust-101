@@ -6,10 +6,10 @@ use opentelemetry::{
     trace::{FutureExt, TraceContextExt, Tracer},
 };
 
-#[get("/hello/{name}")]
+#[get("/greet/{name}")]
 async fn greet(name: web::Path<String>) -> impl Responder {
-    let tracer = global::tracer("request");
-    let (tid, sid) = tracer.in_span("req", move |cx| {
+    let tracer = global::tracer("global");
+    let (tid, sid) = tracer.in_span("greet", move |cx| {
         (
             cx.span().span_context().trace_id().to_u128(),
             cx.span().span_context().span_id().to_u64(),
