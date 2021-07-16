@@ -1,0 +1,10 @@
+[package]
+name = "greeting"
+version = "0.0.1"
+authors = ["glassonion1 <glassonion999@gmail.com>"]
+edition = "2018"
+build = "build.rs"
+
+[dependencies]
+sgx_types = { git = "https://github.com/apache/teaclave-sgx-sdk.git" }
+sgx_urts = { git = "https://github.com/apache/teaclave-sgx-sdk.git" }
