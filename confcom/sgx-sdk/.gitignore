@@ -6,3 +6,5 @@ Enclave_t.h
 *.a
 *.o
 *.so
+
+**/bin
