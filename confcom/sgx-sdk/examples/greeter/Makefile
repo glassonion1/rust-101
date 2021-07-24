@@ -43,8 +43,8 @@ App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(App_Include_Paths)
 
 App_Rust_Path := ./app/target/release
 App_Enclave_u_Object :=lib/libEnclave_u.a
-App_Name := greeting
-App_Dir := bin/greeting
+App_Name := greeter
+App_Dir := bin/$(App_Name)
 
 ######## Enclave Settings ########
 
@@ -92,6 +92,7 @@ app/Enclave_u.o: $(Enclave_EDL_Files)
 
 $(App_Enclave_u_Object): app/Enclave_u.o
 	$(AR) rcsD $@ $^
+
 
 $(App_Dir): $(App_Enclave_u_Object) $(App_SRC_Files)
 	@cd app && SGX_SDK=$(SGX_SDK) cargo build $(App_Rust_Flags)

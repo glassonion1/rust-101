@@ -1,11 +1,11 @@
 [package]
-name = "greetingenclave"
+name = "remoteattestationenclave"
 version = "0.0.1"
 authors = ["glassonion1 <glassonion999@gmail.com>"]
 edition = "2018"
 
 [lib]
-name = "greetingenclave"
+name = "remoteattestationenclave"
 crate-type = ["staticlib"]
 
 [dependencies]

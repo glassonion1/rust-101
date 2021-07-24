@@ -12,8 +12,7 @@ enclave
     
     trusted
     {
-        /*These are ECALL defines.*/
-        public sgx_status_t ping([in, size=len] const uint8_t* message, size_t len, sgx_quote_sign_type_t quote_type);
+        public sgx_status_t verify(sgx_quote_sign_type_t quote_type);
     };
     untrusted
     {

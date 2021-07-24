@@ -65,11 +65,10 @@ pub extern "C" fn ocall_get_quote(
 }
 
 extern "C" {
-    fn ping(
+    fn verify(
         eid: sgx_enclave_id_t,
         retval: *mut sgx_status_t,
-        message: *const u8,
-        len: usize,
+        sign_type: sgx_quote_sign_type_t,
     ) -> sgx_status_t;
 }
 
@@ -104,17 +103,10 @@ fn main() {
         }
     };
 
-    let msg = String::from("ping");
     let mut retval = sgx_status_t::SGX_SUCCESS;
+    let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
 
-    let result = unsafe {
-        ping(
-            enclave.geteid(),
-            &mut retval,
-            msg.as_ptr() as *const u8,
-            msg.len(),
-        )
-    };
+    let result = unsafe { verify(enclave.geteid(), &mut retval, sign_type) };
     match result {
         sgx_status_t::SGX_SUCCESS => {}
         _ => {

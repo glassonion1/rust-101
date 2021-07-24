@@ -1,5 +1,5 @@
 [package]
-name = "greeting"
+name = "remoteattestation"
 version = "0.0.1"
 authors = ["glassonion1 <glassonion999@gmail.com>"]
 edition = "2018"

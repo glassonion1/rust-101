@@ -1,4 +1,4 @@
-#![crate_name = "greetingenclave"]
+#![crate_name = "remoteattestationenclave"]
 #![crate_type = "staticlib"]
 #![cfg_attr(not(target_env = "sgx"), no_std)]
 #![cfg_attr(target_env = "sgx", feature(rustc_private))]
@@ -16,7 +16,7 @@ use crate::sgx_rand::Rng;
 
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_tstd::{env, ptr, slice, string::String, vec::Vec};
+use sgx_tstd::{env, ptr, vec::Vec};
 use sgx_types::*;
 
 mod client;
@@ -51,16 +51,7 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn ping(
-    message: *const u8,
-    len: usize,
-    sign_type: sgx_quote_sign_type_t,
-) -> sgx_status_t {
-    let str_slice = unsafe { slice::from_raw_parts(message, len) };
-
-    let ping = String::from_utf8(str_slice.to_vec()).unwrap();
-    println!("{}", ping);
-
+pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     let ias_key_env = env::var("IAS_KEY").expect("IAS_KEY is not set");
     let ias_key: &str = &ias_key_env;
     let spid_env = env::var("SPID").expect("SPID is not set");
