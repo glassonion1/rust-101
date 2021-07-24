@@ -6,6 +6,7 @@
 #[cfg(not(target_env = "sgx"))]
 #[macro_use]
 extern crate sgx_tstd;
+extern crate base64;
 extern crate http_req;
 extern crate serde;
 extern crate serde_json;
@@ -14,8 +15,8 @@ extern crate sgx_rand;
 use crate::sgx_rand::Rng;
 
 use sgx_tcrypto::SgxEccHandle;
-use sgx_tse::rsgx_create_report;
-use sgx_tstd::{ptr, slice, string::String};
+use sgx_tse::{rsgx_create_report, rsgx_verify_report};
+use sgx_tstd::{env, ptr, slice, string::String, vec::Vec};
 use sgx_types::*;
 
 mod client;
@@ -60,8 +61,13 @@ pub extern "C" fn ping(
     let ping = String::from_utf8(str_slice.to_vec()).unwrap();
     println!("{}", ping);
 
-    let mut ti: sgx_target_info_t = sgx_target_info_t::default();
+    let ias_key_env = env::var("IAS_KEY").expect("IAS_KEY is not set");
+    let ias_key: &str = &ias_key_env;
+    let spid_env = env::var("SPID").expect("SPID is not set");
+    let spid = hex::decode_spid(&spid_env);
+
     let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
+    let mut ti: sgx_target_info_t = sgx_target_info_t::default();
     let mut eg: sgx_epid_group_id_t = sgx_epid_group_id_t::default();
 
     let res = unsafe {
@@ -80,9 +86,8 @@ pub extern "C" fn ping(
         return rt;
     }
 
-    // TODO: ias_key
     let eg_num = as_u32_le(&eg);
-    let sigrl_vec = client::get_sigrl_from_intel(eg_num, "");
+    let sigrl_vec = client::get_sigrl_from_intel(ias_key, eg_num);
 
     let ecc_handle = SgxEccHandle::new();
     let _result = ecc_handle.open();
@@ -125,17 +130,13 @@ pub extern "C" fn ping(
     };
 
     let p_report = (&rep.unwrap()) as *const sgx_report_t;
-
-    // TODO: spid
-    let spid = hex::decode_spid("2C149BFA94A61D306A96211AED155BE8");
     let p_spid = &spid as *const sgx_spid_t;
-
     let p_nonce = &quote_nonce as *const sgx_quote_nonce_t;
     let p_qe_report = &mut qe_report as *mut sgx_report_t;
     let p_quote = return_quote_buf.as_mut_ptr();
     let p_quote_len = &mut quote_len as *mut u32;
 
-    let _result = unsafe {
+    let result = unsafe {
         ocall_get_quote(
             &mut rt as *mut sgx_status_t,
             p_sigrl,
@@ -150,6 +151,34 @@ pub extern "C" fn ping(
             p_quote_len,
         )
     };
+
+    if result != sgx_status_t::SGX_SUCCESS {
+        return result;
+    }
+    if rt != sgx_status_t::SGX_SUCCESS {
+        println!("ocall_get_quote returned {}", rt);
+        return rt;
+    }
+
+    match rsgx_verify_report(&qe_report) {
+        Ok(()) => println!("rsgx_verify_report passed!"),
+        Err(err) => {
+            println!("rsgx_verify_report failed with {:?}", err);
+            return err;
+        }
+    }
+
+    // Check if the qe_report is produced on the same platform
+    if ti.mr_enclave.m != qe_report.body.mr_enclave.m
+        || ti.attributes.flags != qe_report.body.attributes.flags
+        || ti.attributes.xfrm != qe_report.body.attributes.xfrm
+    {
+        println!("qe_report does not match current target_info!");
+        return sgx_status_t::SGX_ERROR_UNEXPECTED;
+    }
+
+    let quote_vec: Vec<u8> = return_quote_buf[..quote_len as usize].to_vec();
+    let _res = client::post_report_from_intel(ias_key, quote_vec);
 
     sgx_status_t::SGX_SUCCESS
 }
