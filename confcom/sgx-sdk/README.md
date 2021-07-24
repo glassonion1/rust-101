@@ -1,6 +1,6 @@
 # Rust SGX SDK Samples
 
-# Build and Run codes
+## Build and Run codes
 Run a docker container based on the `baiduxlab/sgx-rust` image.
 
 ```bash
