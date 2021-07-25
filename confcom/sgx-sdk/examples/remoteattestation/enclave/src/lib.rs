@@ -52,6 +52,8 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 
 #[no_mangle]
 pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
+    println!("verify started");
+
     let ias_key_env = env::var("IAS_KEY").expect("IAS_KEY is not set");
     let ias_key: &str = &ias_key_env;
     let spid_env = env::var("SPID").expect("SPID is not set");
