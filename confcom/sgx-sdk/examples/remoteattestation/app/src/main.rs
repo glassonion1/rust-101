@@ -107,15 +107,16 @@ fn main() {
     let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
 
     let result = unsafe { verify(enclave.geteid(), &mut retval, sign_type) };
-    match result {
-        sgx_status_t::SGX_SUCCESS => {
-            println!("ECALL success!");
-        }
-        _ => {
-            println!("[-] ECALL Enclave Failed {}!", result.as_str());
-            return;
-        }
+    if result != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", result.as_str());
+        return;
     }
+
+    if retval != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", retval.as_str());
+        return;
+    }
+
     println!("[+] remote attestation success...");
     enclave.destroy();
 }
