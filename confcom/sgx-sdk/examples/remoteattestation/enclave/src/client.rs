@@ -12,6 +12,8 @@ pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v3/sigrl/";
 pub const REPORT_SUFFIX: &'static str = "/sgx/dev/attestation/v3/report";
 
 pub fn get_sigrl_from_intel(ias_key: &str, gid: u32) -> Vec<u8> {
+    println!("get_sigrl_from_intel");
+
     let uri_str = format!("https://{}{}/{:08x}", DEV_HOSTNAME, SIGRL_SUFFIX, gid);
     let uri: Uri = uri_str.parse().expect("Invalid uri");
     let host = uri.host_header().expect("Not found host in the uri");
@@ -44,6 +46,8 @@ pub fn get_sigrl_from_intel(ias_key: &str, gid: u32) -> Vec<u8> {
 }
 
 pub fn post_report_from_intel(ias_key: &str, quote: Vec<u8>) -> Vec<u8> {
+    println!("post_report_from_intel");
+
     let uri_str = format!("https://{}{}", DEV_HOSTNAME, REPORT_SUFFIX);
     let uri: Uri = uri_str.parse().expect("Invalid uri");
     let host = uri.host_header().expect("Not found host in the uri");

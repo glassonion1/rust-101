@@ -108,7 +108,9 @@ fn main() {
 
     let result = unsafe { verify(enclave.geteid(), &mut retval, sign_type) };
     match result {
-        sgx_status_t::SGX_SUCCESS => {}
+        sgx_status_t::SGX_SUCCESS => {
+            println!("ECALL success!");
+        }
         _ => {
             println!("[-] ECALL Enclave Failed {}!", result.as_str());
             return;
