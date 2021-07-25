@@ -114,6 +114,6 @@ fn main() {
             return;
         }
     }
-    println!("[+] greeting success...");
+    println!("[+] remote attestation success...");
     enclave.destroy();
 }

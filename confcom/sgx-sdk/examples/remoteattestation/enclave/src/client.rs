@@ -67,6 +67,8 @@ pub fn post_report_from_intel(ias_key: &str, quote: Vec<u8>) -> Vec<u8> {
     let mut res_body = Vec::new();
     let resp = request.send(&mut res_body);
 
+    println!("{:?}", res_body);
+
     match resp {
         Ok(r) => match u16::from(r.status_code()) {
             200 => res_body,

@@ -68,6 +68,6 @@ fn main() {
             return;
         }
     }
-    println!("[+] greeting success...");
+    println!("[+] greeter success...");
     enclave.destroy();
 }
