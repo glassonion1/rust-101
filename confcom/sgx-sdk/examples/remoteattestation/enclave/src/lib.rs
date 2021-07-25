@@ -71,6 +71,8 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         )
     };
 
+    println!("quote initialized");
+
     if res != sgx_status_t::SGX_SUCCESS {
         return res;
     }
