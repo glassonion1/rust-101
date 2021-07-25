@@ -71,7 +71,8 @@ pub fn post_report_from_intel(ias_key: &str, quote: Vec<u8>) -> Vec<u8> {
     let mut res_body = Vec::new();
     let resp = request.send(&mut res_body);
 
-    println!("{:?}", res_body);
+    let b = String::from_utf8(res_body.clone()).unwrap();
+    println!("{}", b);
 
     match resp {
         Ok(r) => match u16::from(r.status_code()) {

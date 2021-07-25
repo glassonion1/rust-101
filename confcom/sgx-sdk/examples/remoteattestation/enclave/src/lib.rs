@@ -71,7 +71,8 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         )
     };
 
-    println!("quote initialized");
+    println!("quote initialized {:?}", res);
+    println!("quote initialized {:?}", rt);
 
     if res != sgx_status_t::SGX_SUCCESS {
         return res;
@@ -80,6 +81,8 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     if rt != sgx_status_t::SGX_SUCCESS {
         return rt;
     }
+
+    println!("quote initialized 2");
 
     let eg_num = as_u32_le(&eg);
     let sigrl_vec = client::get_sigrl_from_intel(ias_key, eg_num);
