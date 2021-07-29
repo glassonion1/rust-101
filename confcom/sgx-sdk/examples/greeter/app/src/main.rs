@@ -5,13 +5,13 @@ use std::slice;
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 
 #[no_mangle]
-pub extern "C" fn pong(message: *const u8, len: usize) {
+pub extern "C" fn ocall_pong(message: *const u8, len: usize) {
     let str_slice = unsafe { slice::from_raw_parts(message, len) };
     println!("{}", String::from_utf8(str_slice.to_vec()).unwrap());
 }
 
 extern "C" {
-    fn ping(
+    fn ecall_ping(
         eid: sgx_enclave_id_t,
         retval: *mut sgx_status_t,
         message: *const u8,
@@ -50,24 +50,27 @@ fn main() {
         }
     };
 
-    let msg = String::from("ping");
     let mut retval = sgx_status_t::SGX_SUCCESS;
+    let msg = String::from("ping");
 
     let result = unsafe {
-        ping(
+        ecall_ping(
             enclave.geteid(),
             &mut retval,
             msg.as_ptr() as *const u8,
             msg.len(),
         )
     };
-    match result {
-        sgx_status_t::SGX_SUCCESS => {}
-        _ => {
-            println!("[-] ECALL Enclave Failed {}!", result.as_str());
-            return;
-        }
+    if result != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", result.as_str());
+        return;
     }
+
+    if retval != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", retval.as_str());
+        return;
+    }
+
     println!("[+] greeter success...");
     enclave.destroy();
 }

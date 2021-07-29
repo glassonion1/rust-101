@@ -5,28 +5,26 @@
 
 #[cfg(not(target_env = "sgx"))]
 #[macro_use]
-extern crate sgx_tstd as std;
-extern crate sgx_types;
+extern crate sgx_tstd;
 
+use sgx_tstd::{slice, string::String};
 use sgx_types::sgx_status_t;
-use std::slice;
-use std::string::String;
 
 extern "C" {
     // OCALLS
-    pub fn pong(message: *const u8, len: usize);
+    pub fn ocall_pong(message: *const u8, len: usize);
 }
 
 #[no_mangle]
-pub extern "C" fn ping(message: *const u8, len: usize) -> sgx_status_t {
+pub extern "C" fn ecall_ping(message: *const u8, len: usize) -> sgx_status_t {
     let str_slice = unsafe { slice::from_raw_parts(message, len) };
 
-    let ping = String::from_utf8(str_slice.to_vec()).unwrap();
-    println!("{}", ping);
+    let message = String::from_utf8(str_slice.to_vec()).unwrap();
+    println!("{}", message);
 
-    let msg = String::from(ping + " pong");
+    let msg = String::from(message + " pong");
     unsafe {
-        pong(msg.as_ptr() as *const u8, msg.len());
+        ocall_pong(msg.as_ptr() as *const u8, msg.len());
     }
 
     sgx_status_t::SGX_SUCCESS
