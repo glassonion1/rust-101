@@ -6,8 +6,8 @@ services:
       - .:/root/sgx
     environment:
       LD_LIBRARY_PATH: "/opt/intel/sgx-aesm-service/aesm"
-    devices:
-      - "/dev/sgx/enclave"
+    #devices:
+    #  - "/dev/sgx/enclave"
     stdin_open: true
     tty: true
     command: bash -c "/opt/intel/sgx-aesm-service/aesm/aesm_service && /bin/bash"

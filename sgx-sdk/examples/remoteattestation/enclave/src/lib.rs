@@ -19,6 +19,7 @@ use sgx_tse::{rsgx_create_report, rsgx_verify_report};
 use sgx_tstd::{env, ptr, vec::Vec};
 use sgx_types::*;
 
+mod cert;
 mod client;
 mod hex;
 
@@ -71,9 +72,6 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         )
     };
 
-    println!("quote initialized {:?}", res);
-    println!("quote initialized {:?}", rt);
-
     if res != sgx_status_t::SGX_SUCCESS {
         return res;
     }
@@ -82,10 +80,14 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         return rt;
     }
 
-    println!("quote initialized 2");
-
     let eg_num = as_u32_le(&eg);
-    let sigrl_vec = client::get_sigrl_from_intel(ias_key, eg_num);
+    let sigrl_vec = match client::get_sigrl_from_intel(ias_key, eg_num) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("client::get_sigrl_from_intel failed with {:?}", e);
+            return e;
+        }
+    };
 
     let ecc_handle = SgxEccHandle::new();
     let _result = ecc_handle.open();
@@ -100,14 +102,14 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     report_data.d[..32].clone_from_slice(&pub_k_gx);
     report_data.d[32..].clone_from_slice(&pub_k_gy);
 
-    let rep = match rsgx_create_report(&ti, &report_data) {
+    let report = match rsgx_create_report(&ti, &report_data) {
         Ok(r) => {
             println!("Report creation => success {:?}", r.body.mr_signer.m);
-            Some(r)
+            r
         }
         Err(e) => {
             println!("Report creation => failed {:?}", e);
-            None
+            return e;
         }
     };
 
@@ -115,6 +117,7 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     let mut os_rng = sgx_rand::SgxRng::new().unwrap();
     os_rng.fill_bytes(&mut quote_nonce.rand);
     println!("rand finished");
+
     let mut qe_report = sgx_report_t::default();
     const RET_QUOTE_BUF_LEN: u32 = 2048;
     let mut return_quote_buf: [u8; RET_QUOTE_BUF_LEN as usize] = [0; RET_QUOTE_BUF_LEN as usize];
@@ -127,7 +130,7 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         (sigrl_vec.as_ptr(), sigrl_vec.len() as u32)
     };
 
-    let p_report = (&rep.unwrap()) as *const sgx_report_t;
+    let p_report = (&report) as *const sgx_report_t;
     let p_spid = &spid as *const sgx_spid_t;
     let p_nonce = &quote_nonce as *const sgx_quote_nonce_t;
     let p_qe_report = &mut qe_report as *mut sgx_report_t;
@@ -160,9 +163,9 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
 
     match rsgx_verify_report(&qe_report) {
         Ok(()) => println!("rsgx_verify_report passed!"),
-        Err(err) => {
-            println!("rsgx_verify_report failed with {:?}", err);
-            return err;
+        Err(e) => {
+            println!("rsgx_verify_report failed with {:?}", e);
+            return e;
         }
     }
 
@@ -176,7 +179,23 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     }
 
     let quote_vec: Vec<u8> = return_quote_buf[..quote_len as usize].to_vec();
-    let _res = client::post_report_from_intel(ias_key, quote_vec);
+    let (attn_report, sig, sig_cert) = match client::post_report_from_intel(ias_key, quote_vec) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("client::post_report_from_intel failed with {:?}", e);
+            return e;
+        }
+    };
+
+    let payload = attn_report + "|" + &sig + "|" + &sig_cert;
+    let (_key_der, _cert_der) = match cert::gen_ecc_cert(payload, &prv_k, &pub_k, &ecc_handle) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("Error in gen_ecc_cert: {:?}", e);
+            return e;
+        }
+    };
+    let _result = ecc_handle.close();
 
     sgx_status_t::SGX_SUCCESS
 }
