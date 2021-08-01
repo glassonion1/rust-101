@@ -14,14 +14,29 @@ extern crate sgx_rand;
 
 use crate::sgx_rand::Rng;
 
+use serde_json::Value;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_tstd::{env, ptr, vec::Vec};
+use sgx_tstd::{env, ptr, string::String, time::SystemTime, vec::Vec};
 use sgx_types::*;
 
-mod cert;
 mod client;
 mod hex;
+
+type SignatureAlgorithms = &'static [&'static webpki::SignatureAlgorithm];
+static SUPPORTED_SIG_ALGS: SignatureAlgorithms = &[
+    &webpki::ECDSA_P256_SHA256,
+    &webpki::ECDSA_P256_SHA384,
+    &webpki::ECDSA_P384_SHA256,
+    &webpki::ECDSA_P384_SHA384,
+    &webpki::RSA_PSS_2048_8192_SHA256_LEGACY_KEY,
+    &webpki::RSA_PSS_2048_8192_SHA384_LEGACY_KEY,
+    &webpki::RSA_PSS_2048_8192_SHA512_LEGACY_KEY,
+    &webpki::RSA_PKCS1_2048_8192_SHA256,
+    &webpki::RSA_PKCS1_2048_8192_SHA384,
+    &webpki::RSA_PKCS1_2048_8192_SHA512,
+    &webpki::RSA_PKCS1_3072_8192_SHA384,
+];
 
 extern "C" {
     pub fn ocall_sgx_init_quote(
@@ -51,15 +66,12 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
         + ((array[3] as u32) << 24)
 }
 
-#[no_mangle]
-pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
-    println!("verify started");
-
-    let ias_key_env = env::var("IAS_KEY").expect("IAS_KEY is not set");
-    let ias_key: &str = &ias_key_env;
-    let spid_env = env::var("SPID").expect("SPID is not set");
-    let spid = hex::decode_spid(&spid_env);
-
+fn create_attestation_report(
+    ias_key: &str,
+    spid: sgx_spid_t,
+    pub_k: &sgx_ec256_public_t,
+    sign_type: sgx_quote_sign_type_t,
+) -> Result<(String, String, String), sgx_status_t> {
     let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
     let mut ti: sgx_target_info_t = sgx_target_info_t::default();
     let mut eg: sgx_epid_group_id_t = sgx_epid_group_id_t::default();
@@ -73,11 +85,11 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     };
 
     if res != sgx_status_t::SGX_SUCCESS {
-        return res;
+        return Err(res);
     }
 
     if rt != sgx_status_t::SGX_SUCCESS {
-        return rt;
+        return Err(rt);
     }
 
     let eg_num = as_u32_le(&eg);
@@ -85,15 +97,10 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         Ok(r) => r,
         Err(e) => {
             println!("client::get_sigrl_from_intel failed with {:?}", e);
-            return e;
+            return Err(e);
         }
     };
 
-    let ecc_handle = SgxEccHandle::new();
-    let _result = ecc_handle.open();
-    let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
-
-    // Generate the report
     let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
     let mut pub_k_gx = pub_k.gx.clone();
     pub_k_gx.reverse();
@@ -109,7 +116,7 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         }
         Err(e) => {
             println!("Report creation => failed {:?}", e);
-            return e;
+            return Err(e);
         }
     };
 
@@ -154,18 +161,18 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     };
 
     if result != sgx_status_t::SGX_SUCCESS {
-        return result;
+        return Err(result);
     }
     if rt != sgx_status_t::SGX_SUCCESS {
         println!("ocall_get_quote returned {}", rt);
-        return rt;
+        return Err(rt);
     }
 
     match rsgx_verify_report(&qe_report) {
         Ok(()) => println!("rsgx_verify_report passed!"),
         Err(e) => {
             println!("rsgx_verify_report failed with {:?}", e);
-            return e;
+            return Err(e);
         }
     }
 
@@ -175,27 +182,82 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         || ti.attributes.xfrm != qe_report.body.attributes.xfrm
     {
         println!("qe_report does not match current target_info!");
-        return sgx_status_t::SGX_ERROR_UNEXPECTED;
+        return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
     }
 
     let quote_vec: Vec<u8> = return_quote_buf[..quote_len as usize].to_vec();
-    let (attn_report, sig, sig_cert) = match client::post_report_from_intel(ias_key, quote_vec) {
-        Ok(r) => r,
+    match client::post_report_from_intel(ias_key, quote_vec) {
+        Ok(r) => Ok(r),
         Err(e) => {
             println!("client::post_report_from_intel failed with {:?}", e);
-            return e;
+            return Err(e);
         }
-    };
+    }
+}
 
-    let payload = attn_report + "|" + &sig + "|" + &sig_cert;
-    let (_key_der, _cert_der) = match cert::gen_ecc_cert(payload, &prv_k, &pub_k, &ecc_handle) {
-        Ok(r) => r,
-        Err(e) => {
-            println!("Error in gen_ecc_cert: {:?}", e);
-            return e;
-        }
-    };
+#[no_mangle]
+pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
+    println!("verify started");
+
+    let ias_key = env::var("IAS_KEY").expect("IAS_KEY is not set");
+    let spid_env = env::var("SPID").expect("SPID is not set");
+    let spid = hex::decode_spid(&spid_env);
+
+    let ecc_handle = SgxEccHandle::new();
+    let _result = ecc_handle.open();
+    let (_prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
+
+    let (attn_report, sig, cert) =
+        match create_attestation_report(&ias_key, spid, &pub_k, sign_type) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("Error in create_attestation_report: {:?}", e);
+                return e;
+            }
+        };
+
     let _result = ecc_handle.close();
+
+    let now = webpki::Time::try_from(SystemTime::now()).unwrap();
+
+    let root_ca = include_bytes!("../ca.crt");
+
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store
+        .add(&rustls::Certificate(root_ca.to_vec()))
+        .unwrap();
+
+    let trust_anchors: Vec<webpki::TrustAnchor> = root_store
+        .roots
+        .iter()
+        .map(|cert| cert.to_trust_anchor())
+        .collect();
+
+    let mut chain: Vec<&[u8]> = Vec::new();
+    chain.push(root_ca);
+
+    let report_cert = webpki::EndEntityCert::from(cert.as_bytes()).unwrap();
+
+    report_cert
+        .verify_is_valid_tls_server_cert(
+            SUPPORTED_SIG_ALGS,
+            &webpki::TLSServerTrustAnchors(&trust_anchors),
+            &chain,
+            now,
+        )
+        .unwrap();
+
+    report_cert
+        .verify_signature(
+            &webpki::RSA_PKCS1_2048_8192_SHA256,
+            attn_report.as_bytes(),
+            sig.as_bytes(),
+        )
+        .unwrap();
+
+    let report: Value = serde_json::from_slice(attn_report.as_bytes()).unwrap();
+
+    println!("{:?}", report);
 
     sgx_status_t::SGX_SUCCESS
 }

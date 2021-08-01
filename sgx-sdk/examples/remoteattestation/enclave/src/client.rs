@@ -7,8 +7,6 @@ use http_req::{
     uri::Uri,
 };
 
-use crate::cert;
-
 pub const DEV_HOSTNAME: &'static str = "api.trustedservices.intel.com";
 pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v3/sigrl/";
 pub const REPORT_SUFFIX: &'static str = "/sgx/dev/attestation/v3/report";
@@ -96,6 +94,19 @@ pub fn post_report_from_intel(
     }
 }
 
+fn percent_decode(orig: String) -> String {
+    let v: Vec<&str> = orig.split("%").collect();
+    let mut ret = String::new();
+    ret.push_str(v[0]);
+    if v.len() > 1 {
+        for s in v[1..].iter() {
+            ret.push(u8::from_str_radix(&s[0..2], 16).unwrap() as char);
+            ret.push_str(&s[2..]);
+        }
+    }
+    ret
+}
+
 fn parse_response_headers(headers: &Headers) -> (String, String) {
     let sig = headers.get("X-IASReport-Signature").unwrap().clone();
 
@@ -104,7 +115,7 @@ fn parse_response_headers(headers: &Headers) -> (String, String) {
         .unwrap()
         .clone();
     sig_cert = sig_cert.replace("%0A", "");
-    sig_cert = cert::percent_decode(sig_cert);
+    sig_cert = percent_decode(sig_cert);
     let v: Vec<&str> = sig_cert.split("-----").collect();
     let sig_cert = String::from(v[2]);
 
