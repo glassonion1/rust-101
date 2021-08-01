@@ -220,11 +220,13 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
 
     let now = webpki::Time::try_from(SystemTime::now()).unwrap();
 
-    let root_ca = include_bytes!("../ca.crt");
+    let root_ca_raw = include_bytes!("../ca.crt");
+    let root_ca_pem = pem::parse(root_ca_raw).expect("failed to parse pem file.");
+    let root_ca = root_ca_pem.contents;
 
     let mut root_store = rustls::RootCertStore::empty();
     root_store
-        .add(&rustls::Certificate(root_ca.to_vec()))
+        .add(&rustls::Certificate(root_ca.clone()))
         .unwrap();
 
     let trust_anchors: Vec<webpki::TrustAnchor> = root_store
@@ -234,7 +236,7 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         .collect();
 
     let mut chain: Vec<&[u8]> = Vec::new();
-    chain.push(root_ca);
+    chain.push(&root_ca);
 
     let report_cert = webpki::EndEntityCert::from(cert.as_bytes()).unwrap();
 
