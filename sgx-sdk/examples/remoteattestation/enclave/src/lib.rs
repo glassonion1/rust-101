@@ -216,6 +216,10 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
             }
         };
 
+    println!("{}", attn_report);
+    println!("{}", sig);
+    println!("{}", cert);
+
     let _result = ecc_handle.close();
 
     let now = webpki::Time::try_from(SystemTime::now()).unwrap();
