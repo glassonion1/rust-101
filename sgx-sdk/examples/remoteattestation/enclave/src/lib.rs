@@ -195,6 +195,61 @@ fn create_attestation_report(
     }
 }
 
+fn verify_intel_report(attn_report: String, sig: String, cert: String) -> Result<(), sgx_status_t> {
+    let now = match webpki::Time::try_from(SystemTime::now()) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("webpki::Time::try_from failed with {:?}", e);
+            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+        }
+    };
+
+    let root_ca_raw = include_bytes!("../ca.crt");
+    let root_ca_pem = pem::parse(root_ca_raw).expect("failed to parse pem file.");
+    let root_ca = root_ca_pem.contents;
+
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store
+        .add(&rustls::Certificate(root_ca.clone()))
+        .unwrap();
+
+    let trust_anchors: Vec<webpki::TrustAnchor> = root_store
+        .roots
+        .iter()
+        .map(|cert| cert.to_trust_anchor())
+        .collect();
+
+    let mut chain: Vec<&[u8]> = Vec::new();
+    chain.push(&root_ca);
+
+    let report_cert = webpki::EndEntityCert::from(cert.as_bytes()).unwrap();
+
+    match report_cert.verify_is_valid_tls_server_cert(
+        SUPPORTED_SIG_ALGS,
+        &webpki::TLSServerTrustAnchors(&trust_anchors),
+        &chain,
+        now,
+    ) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("verify_is_valid_tls_server_cert failed with {:?}", e);
+            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+        }
+    };
+
+    match report_cert.verify_signature(
+        &webpki::RSA_PKCS1_2048_8192_SHA256,
+        attn_report.as_bytes(),
+        sig.as_bytes(),
+    ) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            println!("verify_signature failed with {:?}", e);
+            Err(sgx_status_t::SGX_ERROR_UNEXPECTED)
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     println!("verify started");
@@ -222,44 +277,10 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
 
     let _result = ecc_handle.close();
 
-    let now = webpki::Time::try_from(SystemTime::now()).unwrap();
-
-    let root_ca_raw = include_bytes!("../ca.crt");
-    let root_ca_pem = pem::parse(root_ca_raw).expect("failed to parse pem file.");
-    let root_ca = root_ca_pem.contents;
-
-    let mut root_store = rustls::RootCertStore::empty();
-    root_store
-        .add(&rustls::Certificate(root_ca.clone()))
-        .unwrap();
-
-    let trust_anchors: Vec<webpki::TrustAnchor> = root_store
-        .roots
-        .iter()
-        .map(|cert| cert.to_trust_anchor())
-        .collect();
-
-    let mut chain: Vec<&[u8]> = Vec::new();
-    chain.push(&root_ca);
-
-    let report_cert = webpki::EndEntityCert::from(cert.as_bytes()).unwrap();
-
-    report_cert
-        .verify_is_valid_tls_server_cert(
-            SUPPORTED_SIG_ALGS,
-            &webpki::TLSServerTrustAnchors(&trust_anchors),
-            &chain,
-            now,
-        )
-        .unwrap();
-
-    report_cert
-        .verify_signature(
-            &webpki::RSA_PKCS1_2048_8192_SHA256,
-            attn_report.as_bytes(),
-            sig.as_bytes(),
-        )
-        .unwrap();
+    match verify_intel_report(attn_report.clone(), sig, cert) {
+        Ok(_) => (),
+        Err(e) => return e,
+    };
 
     let report: Value = serde_json::from_slice(attn_report.as_bytes()).unwrap();
 

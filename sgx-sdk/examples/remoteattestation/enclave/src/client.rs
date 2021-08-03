@@ -119,5 +119,8 @@ fn parse_response_headers(headers: &Headers) -> (String, String) {
     let v: Vec<&str> = sig_cert.split("-----").collect();
     let sig_cert = String::from(v[2]);
 
+    let sig = String::from_utf8(base64::decode(sig).unwrap()).unwrap();
+    let sig_cert = String::from_utf8(base64::decode(sig_cert).unwrap()).unwrap();
+
     (sig, sig_cert)
 }
