@@ -8,8 +8,8 @@ use http_req::{
 };
 
 pub const DEV_HOSTNAME: &'static str = "api.trustedservices.intel.com";
-pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v3/sigrl/";
-pub const REPORT_SUFFIX: &'static str = "/sgx/dev/attestation/v3/report";
+pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v4/sigrl/";
+pub const REPORT_SUFFIX: &'static str = "/sgx/dev/attestation/v4/report";
 
 pub fn get_sigrl_from_intel(ias_key: &str, gid: u32) -> Result<Vec<u8>, sgx_status_t> {
     println!("get_sigrl_from_intel");

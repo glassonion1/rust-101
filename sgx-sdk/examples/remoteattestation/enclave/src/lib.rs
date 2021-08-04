@@ -17,7 +17,7 @@ use crate::sgx_rand::Rng;
 use serde_json::Value;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_tstd::{env, ptr, string::String, time::SystemTime, vec::Vec};
+use sgx_tstd::{env, ptr, time::SystemTime, vec::Vec};
 use sgx_types::*;
 
 mod client;
@@ -270,10 +270,6 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
                 return e;
             }
         };
-
-    println!("{:?}", attn_report);
-    println!("{:?}", sig);
-    println!("{:?}", cert);
 
     let _result = ecc_handle.close();
 
