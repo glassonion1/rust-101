@@ -5,3 +5,4 @@ Sample codes written in rust
 - actix-web
 - azure-sdk
 - sgx-sdk
+- crypto_box
