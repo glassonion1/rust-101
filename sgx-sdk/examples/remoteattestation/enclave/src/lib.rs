@@ -71,7 +71,7 @@ fn create_attestation_report(
     spid: sgx_spid_t,
     pub_k: &sgx_ec256_public_t,
     sign_type: sgx_quote_sign_type_t,
-) -> Result<(String, String, String), sgx_status_t> {
+) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), sgx_status_t> {
     let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
     let mut ti: sgx_target_info_t = sgx_target_info_t::default();
     let mut eg: sgx_epid_group_id_t = sgx_epid_group_id_t::default();
@@ -195,7 +195,11 @@ fn create_attestation_report(
     }
 }
 
-fn verify_intel_report(attn_report: String, sig: String, cert: String) -> Result<(), sgx_status_t> {
+fn verify_intel_report(
+    attn_report: Vec<u8>,
+    sig: Vec<u8>,
+    cert: Vec<u8>,
+) -> Result<(), sgx_status_t> {
     let now = match webpki::Time::try_from(SystemTime::now()) {
         Ok(r) => r,
         Err(e) => {
@@ -222,7 +226,7 @@ fn verify_intel_report(attn_report: String, sig: String, cert: String) -> Result
     let mut chain: Vec<&[u8]> = Vec::new();
     chain.push(&root_ca);
 
-    let report_cert = webpki::EndEntityCert::from(cert.as_bytes()).unwrap();
+    let report_cert = webpki::EndEntityCert::from(&cert).unwrap();
 
     match report_cert.verify_is_valid_tls_server_cert(
         SUPPORTED_SIG_ALGS,
@@ -237,11 +241,7 @@ fn verify_intel_report(attn_report: String, sig: String, cert: String) -> Result
         }
     };
 
-    match report_cert.verify_signature(
-        &webpki::RSA_PKCS1_2048_8192_SHA256,
-        attn_report.as_bytes(),
-        sig.as_bytes(),
-    ) {
+    match report_cert.verify_signature(&webpki::RSA_PKCS1_2048_8192_SHA256, &attn_report, &sig) {
         Ok(_) => Ok(()),
         Err(e) => {
             println!("verify_signature failed with {:?}", e);
@@ -271,9 +271,9 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
             }
         };
 
-    println!("{}", attn_report);
-    println!("{}", sig);
-    println!("{}", cert);
+    println!("{:?}", attn_report);
+    println!("{:?}", sig);
+    println!("{:?}", cert);
 
     let _result = ecc_handle.close();
 
@@ -282,7 +282,7 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         Err(e) => return e,
     };
 
-    let report: Value = serde_json::from_slice(attn_report.as_bytes()).unwrap();
+    let report: Value = serde_json::from_slice(&attn_report).unwrap();
 
     println!("{:?}", report);
 

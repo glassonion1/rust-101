@@ -48,7 +48,7 @@ pub fn get_sigrl_from_intel(ias_key: &str, gid: u32) -> Result<Vec<u8>, sgx_stat
 pub fn post_report_from_intel(
     ias_key: &str,
     quote: Vec<u8>,
-) -> Result<(String, String, String), sgx_status_t> {
+) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), sgx_status_t> {
     println!("post_report_from_intel");
 
     let uri_str = format!("https://{}{}", DEV_HOSTNAME, REPORT_SUFFIX);
@@ -78,9 +78,7 @@ pub fn post_report_from_intel(
         Ok(r) => match u16::from(r.status_code()) {
             200 => {
                 let (sig, sig_cert) = parse_response_headers(r.headers());
-                let body = String::from_utf8(res_body.clone()).unwrap();
-                println!("{}", body);
-                Ok((body, sig, sig_cert))
+                Ok((res_body, sig, sig_cert))
             }
             _ => {
                 println!("{:?}", r);
@@ -107,7 +105,7 @@ fn percent_decode(orig: String) -> String {
     ret
 }
 
-fn parse_response_headers(headers: &Headers) -> (String, String) {
+fn parse_response_headers(headers: &Headers) -> (Vec<u8>, Vec<u8>) {
     let sig = headers.get("X-IASReport-Signature").unwrap().clone();
 
     let mut sig_cert = headers
@@ -119,8 +117,8 @@ fn parse_response_headers(headers: &Headers) -> (String, String) {
     let v: Vec<&str> = sig_cert.split("-----").collect();
     let sig_cert = String::from(v[2]);
 
-    let sig = String::from_utf8(base64::decode(sig).unwrap()).unwrap();
-    let sig_cert = String::from_utf8(base64::decode(sig_cert).unwrap()).unwrap();
+    let sig = base64::decode(sig).unwrap();
+    let sig_cert = base64::decode(sig_cert).unwrap();
 
     (sig, sig_cert)
 }
