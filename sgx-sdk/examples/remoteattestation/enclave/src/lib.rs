@@ -14,6 +14,7 @@ extern crate sgx_rand;
 
 use crate::sgx_rand::Rng;
 
+use hex;
 use serde_json::Value;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
@@ -21,7 +22,6 @@ use sgx_tstd::{env, ptr, time::SystemTime, vec::Vec};
 use sgx_types::*;
 
 mod client;
-mod hex;
 
 type SignatureAlgorithms = &'static [&'static webpki::SignatureAlgorithm];
 static SUPPORTED_SIG_ALGS: SignatureAlgorithms = &[
@@ -195,7 +195,7 @@ fn create_attestation_report(
     }
 }
 
-fn verify_intel_report(
+fn verify_intel_sign(
     attn_report: Vec<u8>,
     sig: Vec<u8>,
     cert: Vec<u8>,
@@ -250,13 +250,29 @@ fn verify_intel_report(
     }
 }
 
+pub fn decode_spid(hex: &str) -> sgx_spid_t {
+    let mut spid = sgx_spid_t::default();
+    let hex = hex.trim();
+
+    if hex.len() < 16 * 2 {
+        println!("Input spid file len ({}) is incorrect!", hex.len());
+        return spid;
+    }
+
+    let decoded_vec = hex::decode(hex).unwrap();
+
+    spid.id.copy_from_slice(&decoded_vec[..16]);
+
+    spid
+}
+
 #[no_mangle]
 pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     println!("verify started");
 
     let ias_key = env::var("IAS_KEY").expect("IAS_KEY is not set");
     let spid_env = env::var("SPID").expect("SPID is not set");
-    let spid = hex::decode_spid(&spid_env);
+    let spid = decode_spid(&spid_env);
 
     let ecc_handle = SgxEccHandle::new();
     let _result = ecc_handle.open();
@@ -273,7 +289,7 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
 
     let _result = ecc_handle.close();
 
-    match verify_intel_report(attn_report.clone(), sig, cert) {
+    match verify_intel_sign(attn_report.clone(), sig, cert) {
         Ok(_) => (),
         Err(e) => return e,
     };
