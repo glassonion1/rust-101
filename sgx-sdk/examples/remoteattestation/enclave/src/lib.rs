@@ -59,6 +59,22 @@ extern "C" {
     ) -> sgx_status_t;
 }
 
+pub fn decode_spid(hex: &str) -> sgx_spid_t {
+    let mut spid = sgx_spid_t::default();
+    let hex = hex.trim();
+
+    if hex.len() < 16 * 2 {
+        println!("Input spid file len ({}) is incorrect!", hex.len());
+        return spid;
+    }
+
+    let decoded_vec = hex::decode(hex).unwrap();
+
+    spid.id.copy_from_slice(&decoded_vec[..16]);
+
+    spid
+}
+
 fn as_u32_le(array: &[u8; 4]) -> u32 {
     ((array[0] as u32) << 0)
         + ((array[1] as u32) << 8)
@@ -248,22 +264,6 @@ fn verify_intel_sign(
             Err(sgx_status_t::SGX_ERROR_UNEXPECTED)
         }
     }
-}
-
-pub fn decode_spid(hex: &str) -> sgx_spid_t {
-    let mut spid = sgx_spid_t::default();
-    let hex = hex.trim();
-
-    if hex.len() < 16 * 2 {
-        println!("Input spid file len ({}) is incorrect!", hex.len());
-        return spid;
-    }
-
-    let decoded_vec = hex::decode(hex).unwrap();
-
-    spid.id.copy_from_slice(&decoded_vec[..16]);
-
-    spid
 }
 
 #[no_mangle]
