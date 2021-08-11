@@ -18,7 +18,7 @@ use hex;
 use serde_json::Value;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_tstd::{env, ptr, string::String, time::SystemTime, vec::Vec};
+use sgx_tstd::{env, ptr, str, string::String, time::SystemTime, vec::Vec};
 use sgx_types::*;
 
 mod client;
@@ -276,6 +276,12 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
         return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
     }
 
+    if let Value::String(version) = &attn_report["version"] {
+        if version != "4" {
+            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+        }
+    }
+
     // Verify quote status (mandatory field)
     if let Value::String(quote_status) = &attn_report["isvEnclaveQuoteStatus"] {
         match quote_status.as_ref() {
@@ -342,10 +348,6 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
                     .map(|c| format!("{:02x}", c))
                     .collect::<String>()
             );
-        }
-
-        if sgx_quote.version != 4 {
-            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
         }
     } else {
         println!("Failed to fetch isvEnclaveQuoteBody from attestation report");
