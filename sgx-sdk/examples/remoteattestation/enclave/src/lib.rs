@@ -292,7 +292,7 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
                     let got_pib = hex::decode(pib).unwrap();
                     println!(
                         "Platform Info Blob: {}",
-                        String::from_utf8(got_pib).unwrap()
+                        got_pib.iter().map(|&c| c as char).collect::<String>()
                     );
                 } else {
                     println!("Failed to fetch platformInfoBlob from attestation report");
