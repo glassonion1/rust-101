@@ -18,7 +18,7 @@ use hex;
 use serde_json::Value;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_tstd::{env, ptr, time::SystemTime, vec::Vec};
+use sgx_tstd::{env, ptr, string::String, time::SystemTime, vec::Vec};
 use sgx_types::*;
 
 mod client;
@@ -116,6 +116,11 @@ fn create_attestation_report(
             return Err(e);
         }
     };
+    let (p_sigrl, sigrl_len) = if sigrl_vec.len() == 0 {
+        (ptr::null(), 0)
+    } else {
+        (sigrl_vec.as_ptr(), sigrl_vec.len() as u32)
+    };
 
     let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
     let mut pub_k_gx = pub_k.gx.clone();
@@ -145,13 +150,6 @@ fn create_attestation_report(
     const RET_QUOTE_BUF_LEN: u32 = 2048;
     let mut return_quote_buf: [u8; RET_QUOTE_BUF_LEN as usize] = [0; RET_QUOTE_BUF_LEN as usize];
     let mut quote_len: u32 = 0;
-
-    // Generate the quote
-    let (p_sigrl, sigrl_len) = if sigrl_vec.len() == 0 {
-        (ptr::null(), 0)
-    } else {
-        (sigrl_vec.as_ptr(), sigrl_vec.len() as u32)
-    };
 
     let p_report = (&report) as *const sgx_report_t;
     let p_spid = &spid as *const sgx_spid_t;
@@ -266,6 +264,97 @@ fn verify_intel_sign(
     }
 }
 
+fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
+    let attn_report: Value = serde_json::from_slice(&attn_report).unwrap();
+
+    // Check timestamp is within 24H
+    if let Value::String(time) = &attn_report["timestamp"] {
+        let time_fixed = time.clone() + "+0000";
+        println!("Time = {}", time_fixed);
+    } else {
+        println!("Failed to fetch timestamp from attestation report");
+        return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+    }
+
+    // Verify quote status (mandatory field)
+    if let Value::String(quote_status) = &attn_report["isvEnclaveQuoteStatus"] {
+        match quote_status.as_ref() {
+            "OK" => (),
+            "GROUP_OUT_OF_DATE" | "GROUP_REVOKED" | "CONFIGURATION_NEEDED" => {
+                // Verify platformInfoBlob for further info if status not OK
+                if let Value::String(pib) = &attn_report["platformInfoBlob"] {
+                    let got_pib = hex::decode(pib).unwrap();
+                    println!("{:?}", got_pib);
+                } else {
+                    println!("Failed to fetch platformInfoBlob from attestation report");
+                    return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+                }
+            }
+            _ => return Err(sgx_status_t::SGX_ERROR_UNEXPECTED),
+        }
+    } else {
+        println!("Failed to fetch isvEnclaveQuoteStatus from attestation report");
+        return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+    }
+
+    // Verify quote body
+    if let Value::String(quote_raw) = &attn_report["isvEnclaveQuoteBody"] {
+        let quote = base64::decode(&quote_raw).unwrap();
+        println!("Quote = {:?}", quote);
+
+        let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
+
+        // Borrow of packed field is unsafe in future Rust releases
+        // ATTENTION
+        // DO SECURITY CHECK ON DEMAND
+        // DO SECURITY CHECK ON DEMAND
+        // DO SECURITY CHECK ON DEMAND
+        unsafe {
+            println!("sgx quote version = {}", sgx_quote.version);
+            println!("sgx quote signature type = {}", sgx_quote.sign_type);
+            println!(
+                "sgx quote report_data = {}",
+                sgx_quote
+                    .report_body
+                    .report_data
+                    .d
+                    .iter()
+                    .map(|c| format!("{:02x}", c))
+                    .collect::<String>()
+            );
+            println!(
+                "sgx quote mr_enclave = {}",
+                sgx_quote
+                    .report_body
+                    .mr_enclave
+                    .m
+                    .iter()
+                    .map(|c| format!("{:02x}", c))
+                    .collect::<String>()
+            );
+            println!(
+                "sgx quote mr_signer = {}",
+                sgx_quote
+                    .report_body
+                    .mr_signer
+                    .m
+                    .iter()
+                    .map(|c| format!("{:02x}", c))
+                    .collect::<String>()
+            );
+        }
+
+        if sgx_quote.version != 4 {
+            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+        }
+    } else {
+        println!("Failed to fetch isvEnclaveQuoteBody from attestation report");
+        return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+    }
+
+    Ok(())
+}
+
 #[no_mangle]
 pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     println!("verify started");
@@ -294,9 +383,10 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         Err(e) => return e,
     };
 
-    let report: Value = serde_json::from_slice(&attn_report).unwrap();
-
-    println!("{:?}", report);
+    match verify_intel_response(attn_report) {
+        Ok(_) => (),
+        Err(e) => return e,
+    };
 
     sgx_status_t::SGX_SUCCESS
 }
