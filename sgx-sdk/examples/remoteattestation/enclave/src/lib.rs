@@ -289,10 +289,11 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
             "GROUP_OUT_OF_DATE" | "GROUP_REVOKED" | "CONFIGURATION_NEEDED" => {
                 // Verify platformInfoBlob for further info if status not OK
                 if let Value::String(pib) = &attn_report["platformInfoBlob"] {
-                    let got_pib = hex::decode(pib).unwrap();
+                    let pib_raw = hex::decode(pib).unwrap();
+                    let pib_vec = pib_raw[4..].to_vec();
                     println!(
                         "Platform Info Blob: {}",
-                        got_pib.iter().map(|&c| c as char).collect::<String>()
+                        String::from_utf8(pib_vec).unwrap()
                     );
                 } else {
                     println!("Failed to fetch platformInfoBlob from attestation report");
