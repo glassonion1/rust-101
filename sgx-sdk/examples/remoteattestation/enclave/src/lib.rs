@@ -290,7 +290,10 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
                 // Verify platformInfoBlob for further info if status not OK
                 if let Value::String(pib) = &attn_report["platformInfoBlob"] {
                     let got_pib = hex::decode(pib).unwrap();
-                    println!("{:?}", got_pib);
+                    println!(
+                        "Platform Info Blob: {}",
+                        String::from_utf8(got_pib).unwrap()
+                    );
                 } else {
                     println!("Failed to fetch platformInfoBlob from attestation report");
                     return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
@@ -306,7 +309,6 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
     // Verify quote body
     if let Value::String(quote_raw) = &attn_report["isvEnclaveQuoteBody"] {
         let quote = base64::decode(&quote_raw).unwrap();
-        println!("Quote = {:?}", quote);
 
         let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
 
