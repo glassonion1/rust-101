@@ -271,7 +271,7 @@ fn verify_intel_sign(
     }
 }
 
-fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
+fn get_quote_from_attn_report(attn_report: Vec<u8>) -> Result<sgx_quote_t, sgx_status_t> {
     let attn_report: Value = serde_json::from_slice(&attn_report).unwrap();
 
     // Check timestamp is within 24H
@@ -328,7 +328,7 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
                             println!("update_info.csmeFwUpdate: {}", update_info.csmeFwUpdate);
                             println!("update_info.ucodeUpdate: {}", update_info.ucodeUpdate);
                         }
-                        return Err(rt);
+                        //return Err(rt);
                     }
                 } else {
                     println!("Failed to fetch platformInfoBlob from attestation report");
@@ -342,57 +342,18 @@ fn verify_intel_response(attn_report: Vec<u8>) -> Result<(), sgx_status_t> {
         return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
     }
 
-    // Verify quote body
-    if let Value::String(quote_raw) = &attn_report["isvEnclaveQuoteBody"] {
-        let quote = base64::decode(&quote_raw).unwrap();
+    match &attn_report["isvEnclaveQuoteBody"] {
+        Value::String(quote_raw) => {
+            let quote = base64::decode(&quote_raw).unwrap();
 
-        let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
-
-        // Borrow of packed field is unsafe in future Rust releases
-        // ATTENTION
-        // DO SECURITY CHECK ON DEMAND
-        // DO SECURITY CHECK ON DEMAND
-        // DO SECURITY CHECK ON DEMAND
-        unsafe {
-            println!("sgx quote version = {}", sgx_quote.version);
-            println!("sgx quote signature type = {}", sgx_quote.sign_type);
-            println!(
-                "sgx quote report_data = {}",
-                sgx_quote
-                    .report_body
-                    .report_data
-                    .d
-                    .iter()
-                    .map(|c| format!("{:02x}", c))
-                    .collect::<String>()
-            );
-            println!(
-                "sgx quote mr_enclave = {}",
-                sgx_quote
-                    .report_body
-                    .mr_enclave
-                    .m
-                    .iter()
-                    .map(|c| format!("{:02x}", c))
-                    .collect::<String>()
-            );
-            println!(
-                "sgx quote mr_signer = {}",
-                sgx_quote
-                    .report_body
-                    .mr_signer
-                    .m
-                    .iter()
-                    .map(|c| format!("{:02x}", c))
-                    .collect::<String>()
-            );
+            let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
+            Ok(sgx_quote)
         }
-    } else {
-        println!("Failed to fetch isvEnclaveQuoteBody from attestation report");
-        return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+        _ => {
+            println!("Failed to fetch isvEnclaveQuoteBody from attestation report");
+            Err(sgx_status_t::SGX_ERROR_UNEXPECTED)
+        }
     }
-
-    Ok(())
 }
 
 #[no_mangle]
@@ -423,9 +384,49 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
         Err(e) => return e,
     };
 
-    match verify_intel_response(attn_report) {
-        Ok(_) => (),
+    let sgx_quote = match get_quote_from_attn_report(attn_report) {
+        Ok(r) => r,
         Err(e) => return e,
+    };
+
+    // Borrow of packed field is unsafe in future Rust releases
+    // ATTENTION
+    // DO SECURITY CHECK ON DEMAND
+    // DO SECURITY CHECK ON DEMAND
+    // DO SECURITY CHECK ON DEMAND
+    unsafe {
+        println!("sgx quote version = {}", sgx_quote.version);
+        println!("sgx quote signature type = {}", sgx_quote.sign_type);
+        println!(
+            "sgx quote report_data = {}",
+            sgx_quote
+                .report_body
+                .report_data
+                .d
+                .iter()
+                .map(|c| format!("{:02x}", c))
+                .collect::<String>()
+        );
+        println!(
+            "sgx quote mr_enclave = {}",
+            sgx_quote
+                .report_body
+                .mr_enclave
+                .m
+                .iter()
+                .map(|c| format!("{:02x}", c))
+                .collect::<String>()
+        );
+        println!(
+            "sgx quote mr_signer = {}",
+            sgx_quote
+                .report_body
+                .mr_signer
+                .m
+                .iter()
+                .map(|c| format!("{:02x}", c))
+                .collect::<String>()
+        );
     };
 
     sgx_status_t::SGX_SUCCESS
