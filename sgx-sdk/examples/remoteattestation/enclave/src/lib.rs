@@ -207,10 +207,10 @@ fn create_attestation_report(
     }
 
     let quote_vec: Vec<u8> = return_quote_buf[..quote_len as usize].to_vec();
-    match client::post_report_from_intel(ias_key, quote_vec) {
+    match client::post_report_to_intel(ias_key, quote_vec) {
         Ok(r) => Ok(r),
         Err(e) => {
-            println!("client::post_report_from_intel failed with {:?}", e);
+            println!("client::post_report_to_intel failed with {:?}", e);
             return Err(e);
         }
     }

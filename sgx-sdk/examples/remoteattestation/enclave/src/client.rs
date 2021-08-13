@@ -45,7 +45,7 @@ pub fn get_sigrl_from_intel(ias_key: &str, gid: u32) -> Result<Vec<u8>, sgx_stat
     }
 }
 
-pub fn post_report_from_intel(
+pub fn post_report_to_intel(
     ias_key: &str,
     quote: Vec<u8>,
 ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), sgx_status_t> {
