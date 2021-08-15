@@ -2,9 +2,11 @@ use crypto_box::{
     aead::{Aead, Payload},
     ChaChaBox, SecretKey,
 };
+use rand_chacha::rand_core::SeedableRng;
 
 fn main() {
-    let mut rng = rand_core::OsRng;
+    // generates random from chacha20
+    let mut rng = rand_chacha::ChaChaRng::from_seed(Default::default());
     // generates Alice's key pair
     let alice_secret_key = SecretKey::generate(&mut rng);
     let alice_public_key = alice_secret_key.public_key();
