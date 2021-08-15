@@ -7,4 +7,4 @@ edition = "2018"
 [dependencies]
 # https://github.com/RustCrypto/nacl-compat
 crypto_box = "0.6.1"
-rand_chacha = "0.3"
+rand_chacha = { version = "0.3", default-features = false }
