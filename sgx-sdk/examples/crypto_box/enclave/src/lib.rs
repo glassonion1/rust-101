@@ -8,66 +8,58 @@
 extern crate sgx_tstd;
 
 use crypto_box::{
-    aead::{generic_array::GenericArray, Aead, Payload},
-    ChaChaBox, PublicKey, SecretKey,
+    aead::{Aead, Payload},
+    ChaChaBox, SecretKey,
 };
 use rand_chacha::rand_core::SeedableRng;
-use sgx_tstd::{io::Read, ptr, slice};
+use sgx_tstd::string::String;
 use sgx_types::sgx_status_t;
 
-const KEY_SIZE: usize = 32;
-
 #[no_mangle]
-pub extern "C" fn ecall_encrypt(
-    in_nonce: *const u8,
-    in_nonce_len: usize,
-    in_msg: *const u8,
-    in_msg_len: usize,
-    in_pubkey: *const u8,
-    in_pubkey_len: usize,
-    out_ciphertext: *mut u8,
-    _out_max_len: usize,
-    out_ciphertext_len: &mut usize,
-    out_pubkey: *mut u8,
-    _out_pubkey_len: usize,
-) -> sgx_status_t {
-    let nonce = unsafe { slice::from_raw_parts(in_nonce, in_nonce_len) };
-    let nonce = GenericArray::from_slice(nonce);
-    let msg = unsafe { slice::from_raw_parts(in_msg, in_msg_len) };
-    let mut pubkey_slice = unsafe { slice::from_raw_parts(in_pubkey, in_pubkey_len) };
-    let mut buf = [0; KEY_SIZE];
-    pubkey_slice.read_exact(&mut buf).unwrap();
-    let alice_public_key = PublicKey::from(buf);
-
+pub extern "C" fn ecall_encrypt() -> sgx_status_t {
+    // generates random from chacha20
     let mut rng = rand_chacha::ChaChaRng::from_seed(Default::default());
-
-    // generates key pair
+    // generates Alice's key pair
+    let alice_secret_key = SecretKey::generate(&mut rng);
+    let alice_public_key = alice_secret_key.public_key();
+    // generates Bob's key pair
     let bob_secret_key = SecretKey::generate(&mut rng);
     let bob_public_key = bob_secret_key.public_key();
+    // generates a nonce.
+    let nonce = crypto_box::generate_nonce(&mut rng);
 
-    println!("Bob's secret key: {:?}", bob_secret_key.to_bytes());
-    println!("Bob's public key: {:?}", bob_public_key);
-
-    let ciphertext = ChaChaBox::new(&alice_public_key, &bob_secret_key)
+    // encrypts the plaintext
+    let plaintext = "hello Bob";
+    let ciphertext = ChaChaBox::new(&bob_public_key, &alice_secret_key)
         .encrypt(
-            nonce,
+            &nonce,
             Payload {
-                msg: msg,
+                msg: plaintext.as_bytes(),
                 aad: b"".as_ref(), // Additional Authentication data
             },
         )
         .unwrap();
 
-    println!("cipertext: {:?}", ciphertext);
+    // outputs the ciphertext of string
+    let t = ciphertext
+        .iter()
+        .map(|&c| format!("{:02x}", c))
+        .collect::<String>();
+    println!("{}", t);
 
-    *out_ciphertext_len = ciphertext.len();
+    // decrypts the cipertext
+    let decrypted = ChaChaBox::new(&alice_public_key, &bob_secret_key)
+        .decrypt(
+            &nonce,
+            Payload {
+                msg: &ciphertext,
+                aad: b"".as_ref(),
+            },
+        )
+        .unwrap();
 
-    let b_pubkey = bob_public_key.as_bytes();
-
-    unsafe {
-        ptr::copy_nonoverlapping(ciphertext.as_ptr(), out_ciphertext, ciphertext.len());
-        ptr::copy_nonoverlapping(b_pubkey.as_ptr(), out_pubkey, b_pubkey.len());
-    }
+    let decrypted = sgx_tstd::str::from_utf8(&decrypted).unwrap();
+    println!("{}", decrypted);
 
     sgx_status_t::SGX_SUCCESS
 }
