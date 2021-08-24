@@ -43,7 +43,7 @@ App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(App_Include_Paths)
 
 App_Rust_Path := ./app/target/release
 App_Enclave_u_Object :=lib/libEnclave_u.a
-App_Name := nacl
+App_Name := cryptobox
 App_Dir := bin/$(App_Name)
 
 ######## Enclave Settings ########
