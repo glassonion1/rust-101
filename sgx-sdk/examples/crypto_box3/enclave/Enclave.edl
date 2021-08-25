@@ -8,17 +8,18 @@ enclave
     trusted
     {
         /*These are ECALL defines.*/
-        public sgx_status_t ecall_get_encryption_key(
-            [out, size=out_pubkey_len] uint8_t* out_pubkey,
-            size_t out_pubkey_len
-        );
-        public sgx_status_t ecall_decrypt(
+        public sgx_status_t ecall_encrypt(
             [in, size=in_nonce_len] uint8_t* in_nonce,
             size_t in_nonce_len,
+            [in, size=in_msg_len] uint8_t* in_msg,
+            size_t in_msg_len,
             [in, size=in_pubkey_len] uint8_t* in_pubkey,
             size_t in_pubkey_len,
-            [in, size=in_ciphertext_len] uint8_t* in_ciphertext,
-            size_t in_ciphertext_len
+            [out, size=out_max_len] uint8_t* out_ciphertext,
+            size_t out_max_len,
+            [out] size_t *out_ciphertext_len,
+            [out, size=out_pubkey_len] uint8_t* out_pubkey,
+            size_t out_pubkey_len
         );
     };
     untrusted

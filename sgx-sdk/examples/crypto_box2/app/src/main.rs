@@ -7,24 +7,25 @@ use sgx_urts::SgxEnclave;
 use std::io::Read;
 
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
-const MAX_OUT_LEN: usize = 1024;
 const KEY_SIZE: usize = 32;
 
 extern "C" {
-    fn ecall_encrypt(
+    fn ecall_get_encryption_key(
+        eid: sgx_enclave_id_t,
+        retval: *mut sgx_status_t,
+        out_pubkey: *mut u8,
+        out_pubkey_len: usize,
+    ) -> sgx_status_t;
+
+    fn ecall_decrypt(
         eid: sgx_enclave_id_t,
         retval: *mut sgx_status_t,
         in_nonce: *const u8,
         in_noce_len: usize,
-        in_msg: *const u8,
-        in_msg_len: usize,
         in_pubkey: *const u8,
         in_pubkey_len: usize,
-        out_ciphertext: *mut u8,
-        out_max_len: usize,
-        out_ciphertext_len: &mut usize,
-        out_pubkey: *mut u8,
-        out_pubkey_len: usize,
+        in_ciphertext: *const u8,
+        in_ciphertext_len: usize,
     ) -> sgx_status_t;
 }
 
@@ -59,40 +60,60 @@ fn main() {
         }
     };
 
-    let mut rng = rand_core::OsRng;
+    // gets bob's public key
+    let mut retval = sgx_status_t::SGX_SUCCESS;
+    let mut key = vec![0; KEY_SIZE];
+    let key_ptr = key.as_mut_ptr();
+
+    let result =
+        unsafe { ecall_get_encryption_key(enclave.geteid(), &mut retval, key_ptr, key.len()) };
+    if result != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", result.as_str());
+        return;
+    }
+    if retval != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", retval.as_str());
+        return;
+    }
+
+    let mut buf = [0; KEY_SIZE];
+    (&key[..]).read_exact(&mut buf).unwrap();
+    let bob_public_key = PublicKey::from(buf);
 
     // generates key pair
+    let mut rng = rand_core::OsRng;
     let alice_secret_key = SecretKey::generate(&mut rng);
     let alice_public_key = alice_secret_key.public_key();
 
-    println!("Alice's secret key: {:?}", alice_secret_key.to_bytes());
+    println!("Alice's secret key: {:?}", alice_secret_key);
     println!("Alice's public key: {:?}", alice_public_key);
 
     let nonce = crypto_box::generate_nonce(&mut rng);
-
     let msg = String::from("hello bob!");
-    let b_pubkey = alice_public_key.as_bytes();
+    // ecrypts the message
+    let ciphertext = ChaChaBox::new(&bob_public_key, &alice_secret_key)
+        .encrypt(
+            &nonce,
+            Payload {
+                msg: msg.as_bytes(),
+                aad: b"".as_ref(), // Additional Authentication data
+            },
+        )
+        .unwrap();
 
     let mut retval = sgx_status_t::SGX_SUCCESS;
-    let mut ciphertext = vec![0; MAX_OUT_LEN];
-    let mut ciphertext_len = MAX_OUT_LEN;
-    let mut bob_public_key = vec![0; KEY_SIZE];
+    let b_pubkey = alice_public_key.as_bytes();
 
     let result = unsafe {
-        ecall_encrypt(
+        ecall_decrypt(
             enclave.geteid(),
             &mut retval,
             nonce.as_ptr(),
             nonce.len(),
-            msg.as_ptr() as *const u8,
-            msg.len(),
             b_pubkey.as_ptr(),
             b_pubkey.len(),
-            ciphertext.as_mut_ptr(),
-            MAX_OUT_LEN,
-            &mut ciphertext_len,
-            bob_public_key.as_mut_ptr(),
-            KEY_SIZE,
+            ciphertext.as_ptr(),
+            ciphertext.len(),
         )
     };
     if result != sgx_status_t::SGX_SUCCESS {
@@ -103,29 +124,6 @@ fn main() {
         println!("[-] ECALL Enclave Failed {}!", retval.as_str());
         return;
     }
-
-    let ciphertext = &ciphertext[0..ciphertext_len];
-    println!("{:?}", ciphertext);
-    println!("{:?}", bob_public_key);
-    let mut buf = [0; KEY_SIZE];
-    (&bob_public_key[..]).read_exact(&mut buf).unwrap();
-    let bob_public_key = PublicKey::from(buf);
-
-    // decrypts the cipertext
-    let decrypted = ChaChaBox::new(&bob_public_key, &alice_secret_key)
-        .decrypt(
-            &nonce,
-            Payload {
-                msg: ciphertext,
-                aad: b"".as_ref(),
-            },
-        )
-        .unwrap();
-
-    let decrypted = std::str::from_utf8(&decrypted).unwrap();
-    println!("{}", decrypted);
-
-    assert_eq!(msg, decrypted);
 
     println!("[+] crypto_box success...");
     enclave.destroy();
