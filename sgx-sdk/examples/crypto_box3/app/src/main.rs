@@ -2,7 +2,6 @@ use crypto_box::{
     aead::{Aead, Payload},
     ChaChaBox, PublicKey, SecretKey,
 };
-use rand_chacha::rand_core::SeedableRng;
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
 use std::io::Read;
@@ -81,18 +80,15 @@ fn main() {
     (&key[..]).read_exact(&mut buf).unwrap();
     let bob_public_key = PublicKey::from(buf);
 
-    let mut rng = rand_chacha::ChaChaRng::from_seed(Default::default());
-
     // generates key pair
+    let mut rng = rand_core::OsRng;
     let alice_secret_key = SecretKey::generate(&mut rng);
     let alice_public_key = alice_secret_key.public_key();
 
-    println!("Alice's secret key: {:?}", alice_secret_key.to_bytes());
+    println!("Alice's secret key: {:?}", alice_secret_key);
     println!("Alice's public key: {:?}", alice_public_key);
 
-    let mut retval = sgx_status_t::SGX_SUCCESS;
     let nonce = crypto_box::generate_nonce(&mut rng);
-    let b_pubkey = alice_public_key.as_bytes();
     let msg = String::from("hello bob!");
     // ecrypts the message
     let ciphertext = ChaChaBox::new(&bob_public_key, &alice_secret_key)
@@ -104,6 +100,9 @@ fn main() {
             },
         )
         .unwrap();
+
+    let mut retval = sgx_status_t::SGX_SUCCESS;
+    let b_pubkey = alice_public_key.as_bytes();
 
     let result = unsafe {
         ecall_decrypt(
@@ -126,6 +125,6 @@ fn main() {
         return;
     }
 
-    println!("[+] nacl success...");
+    println!("[+] crypto_box success...");
     enclave.destroy();
 }

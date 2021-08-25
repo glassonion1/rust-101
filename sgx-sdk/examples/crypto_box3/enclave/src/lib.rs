@@ -12,7 +12,6 @@ use crypto_box::{
     ChaChaBox, PublicKey, SecretKey,
 };
 use once_cell::sync::OnceCell;
-use rand_chacha::rand_core::SeedableRng;
 use sgx_tstd::{io::Read, ptr, slice};
 use sgx_types::sgx_status_t;
 
@@ -25,14 +24,14 @@ pub extern "C" fn ecall_get_encryption_key(
     out_pubkey: *mut u8,
     _out_pubkey_len: usize,
 ) -> sgx_status_t {
-    let mut rng = rand_chacha::ChaChaRng::from_seed(Default::default());
-
     // generates key pair
-    let secret_key = SecretKey::generate(&mut rng);
+    let mut rnd = [0u8; KEY_SIZE];
+    getrandom::getrandom(&mut rnd).unwrap();
+    let secret_key = SecretKey::from(rnd);
     let public_key = secret_key.public_key();
 
-    println!("{:?}", secret_key);
-    println!("{:?}", public_key);
+    println!("Bob's secret key: {:?}", secret_key);
+    println!("Bob's public key: {:?}", public_key);
 
     SECRET_KEY.set(secret_key.to_bytes()).unwrap();
 
@@ -80,7 +79,7 @@ pub extern "C" fn ecall_decrypt(
         .unwrap();
 
     let decrypted = sgx_tstd::str::from_utf8(&decrypted).unwrap();
-    println!("decrypted test: {}", decrypted);
+    println!("decrypted message: {}", decrypted);
 
     sgx_status_t::SGX_SUCCESS
 }
