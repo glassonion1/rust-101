@@ -11,7 +11,6 @@ use crypto_box::{
     aead::{generic_array::GenericArray, Aead, Payload},
     ChaChaBox, PublicKey, SecretKey,
 };
-use rand_chacha::rand_core::SeedableRng;
 use sgx_tstd::{io::Read, ptr, slice};
 use sgx_types::sgx_status_t;
 
@@ -39,10 +38,11 @@ pub extern "C" fn ecall_encrypt(
     pubkey_slice.read_exact(&mut buf).unwrap();
     let alice_public_key = PublicKey::from(buf);
 
-    let mut rng = rand_chacha::ChaChaRng::from_seed(Default::default());
+    let mut rnd = [0u8; KEY_SIZE];
+    getrandom::getrandom(&mut rnd).unwrap();
 
     // generates key pair
-    let bob_secret_key = SecretKey::generate(&mut rng);
+    let bob_secret_key = SecretKey::from(rnd);
     let bob_public_key = bob_secret_key.public_key();
 
     println!("Bob's secret key: {:?}", bob_secret_key.to_bytes());

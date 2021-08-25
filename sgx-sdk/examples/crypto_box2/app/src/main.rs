@@ -2,7 +2,6 @@ use crypto_box::{
     aead::{Aead, Payload},
     ChaChaBox, PublicKey, SecretKey,
 };
-use rand_chacha::rand_core::SeedableRng;
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
 use std::io::Read;
@@ -60,7 +59,7 @@ fn main() {
         }
     };
 
-    let mut rng = rand_chacha::ChaChaRng::from_seed(Default::default());
+    let mut rng = rand_core::OsRng;
 
     // generates key pair
     let alice_secret_key = SecretKey::generate(&mut rng);
@@ -128,6 +127,6 @@ fn main() {
 
     assert_eq!(msg, decrypted);
 
-    println!("[+] nacl success...");
+    println!("[+] crypto_box success...");
     enclave.destroy();
 }

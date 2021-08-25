@@ -50,6 +50,6 @@ fn main() {
         return;
     }
 
-    println!("[+] nacl success...");
+    println!("[+] crypto_box success...");
     enclave.destroy();
 }

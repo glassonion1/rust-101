@@ -15,10 +15,14 @@ use rand_chacha::rand_core::SeedableRng;
 use sgx_tstd::string::String;
 use sgx_types::sgx_status_t;
 
+const KEY_SIZE: usize = 32;
+
 #[no_mangle]
 pub extern "C" fn ecall_encrypt() -> sgx_status_t {
     // generates random from chacha20
-    let mut rng = rand_chacha::ChaChaRng::from_seed(Default::default());
+    let mut seed = [0u8; KEY_SIZE];
+    getrandom::getrandom(&mut seed).unwrap();
+    let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
     // generates Alice's key pair
     let alice_secret_key = SecretKey::generate(&mut rng);
     let alice_public_key = alice_secret_key.public_key();
