@@ -101,6 +101,8 @@ fn main() {
         )
         .unwrap();
 
+    println!("encrypted message: {:?}", ciphertext);
+
     let mut retval = sgx_status_t::SGX_SUCCESS;
     let b_pubkey = alice_public_key.as_bytes();
 
