@@ -1,0 +1,20 @@
+enclave
+{
+    from "sgx_tstd.edl" import *;
+    from "sgx_stdio.edl" import *;
+    from "sgx_backtrace.edl" import *;
+    from "sgx_tstdc.edl" import *;
+
+    trusted
+    {
+        /*These are ECALL defines.*/
+        public sgx_status_t ecall_encrypt();
+    };
+    untrusted
+    {
+        sgx_status_t ocall_getrandom(
+            [out, size=out_dest_len] uint8_t* out_dest,
+            size_t out_dest_len
+        );
+    };
+};
