@@ -12,9 +12,5 @@ enclave
     };
     untrusted
     {
-        sgx_status_t ocall_getrandom(
-            [out, size=out_dest_len] uint8_t* out_dest,
-            size_t out_dest_len
-        );
     };
 };

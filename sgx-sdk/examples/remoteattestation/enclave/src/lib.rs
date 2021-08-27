@@ -149,7 +149,10 @@ fn create_attestation_report(
     };
 
     let mut quote_nonce = sgx_quote_nonce_t { rand: [0; 16] };
-    let mut os_rng = sgx_rand::SgxRng::new().unwrap();
+    let mut os_rng = match sgx_rand::SgxRng::new() {
+        Ok(r) => r,
+        Err(_) => return Err(sgx_status_t::SGX_ERROR_UNEXPECTED),
+    };
     os_rng.fill_bytes(&mut quote_nonce.rand);
     println!("rand finished");
 

@@ -12,6 +12,7 @@ use crypto_box::{
     ChaChaBox, SecretKey,
 };
 use rand_chacha::rand_core::SeedableRng;
+use sgx_trts::trts::rsgx_read_rand;
 use sgx_tstd::string::String;
 use sgx_types::sgx_status_t;
 
@@ -21,7 +22,11 @@ const KEY_SIZE: usize = 32;
 pub extern "C" fn ecall_encrypt() -> sgx_status_t {
     // generates random from chacha20
     let mut seed = [0u8; KEY_SIZE];
-    getrandom::getrandom(&mut seed).unwrap();
+    match rsgx_read_rand(&mut seed) {
+        Ok(_) => (),
+        Err(e) => return e,
+    };
+
     let mut rng = rand_chacha::ChaChaRng::from_seed(seed);
     // generates Alice's key pair
     let alice_secret_key = SecretKey::generate(&mut rng);

@@ -13,7 +13,6 @@ sgx_types = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.
 sgx_tstd = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", features = ["backtrace"] }
 sgx_trts = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3"}
 crypto_box = "0.6.1"
-getrandom = { git = "https://github.com/mesalock-linux/getrandom-sgx" }
 once_cell = {git = "https://github.com/mesalock-linux/once_cell-sgx" }
 
 [features]

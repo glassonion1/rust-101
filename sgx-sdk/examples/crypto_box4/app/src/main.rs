@@ -8,25 +8,6 @@ extern "C" {
     fn ecall_encrypt(eid: sgx_enclave_id_t, retval: *mut sgx_status_t) -> sgx_status_t;
 }
 
-#[no_mangle]
-pub extern "C" fn ocall_getrandom(out_dest: *mut u8, out_dest_len: usize) -> sgx_status_t {
-    let mut dest_slice = unsafe { slice::from_raw_parts(out_dest, out_dest_len) };
-    let mut tmp = vec![0u8; out_dest_len];
-    let mut dest = &mut tmp;
-    dest_slice.read_exact(&mut dest).unwrap();
-
-    let ret = getrandom::getrandom(&mut dest);
-    if ret != Ok(()) {
-        return sgx_status_t::SGX_ERROR_UNEXPECTED;
-    }
-
-    unsafe {
-        ptr::copy_nonoverlapping(dest.as_ptr(), out_dest, dest.len());
-    }
-
-    sgx_status_t::SGX_SUCCESS
-}
-
 fn init_enclave() -> SgxResult<SgxEnclave> {
     let mut launch_token: sgx_launch_token_t = [0; 1024];
     let mut launch_token_updated: i32 = 0;
