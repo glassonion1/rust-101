@@ -1,0 +1,19 @@
+enclave
+{
+    from "sgx_tstd.edl" import *;
+    from "sgx_stdio.edl" import *;
+    from "sgx_backtrace.edl" import *;
+    from "sgx_tstdc.edl" import *;
+
+    trusted
+    {
+        /*These are ECALL defines.*/
+        public sgx_status_t create_sealeddata(
+           [in, size=message_len] const uint8_t* message,
+           size_t message_len
+        );
+    };
+    untrusted
+    {
+    };
+};
