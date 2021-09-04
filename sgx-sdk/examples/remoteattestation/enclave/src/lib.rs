@@ -16,8 +16,7 @@ use crate::sgx_rand::Rng;
 
 use hex;
 use serde_json::Value;
-use sgx_tcrypto::SgxEccHandle;
-use sgx_tse::{rsgx_create_report, rsgx_verify_report};
+use sgx_tse::rsgx_verify_report;
 use sgx_tstd::{env, ptr, str, string::String, time::SystemTime, vec::Vec};
 use sgx_types::*;
 
@@ -92,7 +91,6 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 fn create_attestation_report(
     ias_key: &str,
     spid: sgx_spid_t,
-    pub_k: &sgx_ec256_public_t,
     sign_type: sgx_quote_sign_type_t,
 ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), sgx_status_t> {
     let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
@@ -129,25 +127,6 @@ fn create_attestation_report(
         (sigrl_vec.as_ptr(), sigrl_vec.len() as u32)
     };
 
-    let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
-    let mut pub_k_gx = pub_k.gx.clone();
-    pub_k_gx.reverse();
-    let mut pub_k_gy = pub_k.gy.clone();
-    pub_k_gy.reverse();
-    report_data.d[..32].clone_from_slice(&pub_k_gx);
-    report_data.d[32..].clone_from_slice(&pub_k_gy);
-
-    let report = match rsgx_create_report(&ti, &report_data) {
-        Ok(r) => {
-            println!("Report creation => success {:?}", r.body.mr_signer.m);
-            r
-        }
-        Err(e) => {
-            println!("Report creation => failed {:?}", e);
-            return Err(e);
-        }
-    };
-
     let mut quote_nonce = sgx_quote_nonce_t { rand: [0; 16] };
     let mut os_rng = match sgx_rand::SgxRng::new() {
         Ok(r) => r,
@@ -161,7 +140,7 @@ fn create_attestation_report(
     let mut return_quote_buf: [u8; RET_QUOTE_BUF_LEN as usize] = [0; RET_QUOTE_BUF_LEN as usize];
     let mut quote_len: u32 = 0;
 
-    let p_report = (&report) as *const sgx_report_t;
+    let p_report = ptr::null();
     let p_spid = &spid as *const sgx_spid_t;
     let p_nonce = &quote_nonce as *const sgx_quote_nonce_t;
     let p_qe_report = &mut qe_report as *mut sgx_report_t;
@@ -367,20 +346,13 @@ pub extern "C" fn verify(sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
     let spid_env = env::var("SPID").expect("SPID is not set");
     let spid = decode_spid(&spid_env);
 
-    let ecc_handle = SgxEccHandle::new();
-    let _result = ecc_handle.open();
-    let (_prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
-
-    let (attn_report, sig, cert) =
-        match create_attestation_report(&ias_key, spid, &pub_k, sign_type) {
-            Ok(r) => r,
-            Err(e) => {
-                println!("Error in create_attestation_report: {:?}", e);
-                return e;
-            }
-        };
-
-    let _result = ecc_handle.close();
+    let (attn_report, sig, cert) = match create_attestation_report(&ias_key, spid, sign_type) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("Error in create_attestation_report: {:?}", e);
+            return e;
+        }
+    };
 
     match verify_intel_sign(attn_report.clone(), sig, cert) {
         Ok(_) => (),
