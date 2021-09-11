@@ -43,7 +43,7 @@ App_C_Flags := $(SGX_COMMON_CFLAGS) -fPIC -Wno-attributes $(App_Include_Paths)
 
 App_Rust_Path := ./app/target/release
 App_Enclave_u_Object :=lib/libEnclave_u.a
-App_Name := remoteattestation
+App_Name := sealeddata
 App_Dir := bin/$(App_Name)
 
 ######## Enclave Settings ########
@@ -84,6 +84,7 @@ $(Enclave_EDL_Files): $(SGX_EDGER8R) enclave/Enclave.edl
 	$(SGX_EDGER8R) --untrusted enclave/Enclave.edl --search-path $(SGX_SDK)/include --search-path $(CUSTOM_EDL_PATH) --untrusted-dir app
 	@echo "GEN  =>  $(Enclave_EDL_Files)"
 
+
 ######## App Objects ########
 
 app/Enclave_u.o: $(Enclave_EDL_Files)
@@ -92,6 +93,7 @@ app/Enclave_u.o: $(Enclave_EDL_Files)
 
 $(App_Enclave_u_Object): app/Enclave_u.o
 	$(AR) rcsD $@ $^
+
 
 $(App_Dir): $(App_Enclave_u_Object) $(App_SRC_Files)
 	@cd app && SGX_SDK=$(SGX_SDK) cargo build $(App_Rust_Flags)
@@ -111,7 +113,7 @@ $(RustEnclave_Name): enclave enclave/Enclave_t.o
 
 $(Signed_RustEnclave_Name): $(RustEnclave_Name)
 	mkdir -p bin
-	@$(SGX_ENCLAVE_SIGNER) sign -key enclave/Enclave_private.pem -enclave $(RustEnclave_Name) -out $@ -config enclave/Enclave.config.xml
+	@$(SGX_ENCLAVE_SIGNER) sign -key enclave/Enclave_private2.pem -enclave $(RustEnclave_Name) -out $@ -config enclave/Enclave.config.xml
 	@echo "SIGN =>  $@"
 
 .PHONY: enclave

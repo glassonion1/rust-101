@@ -26,43 +26,35 @@ pub extern "C" fn create_sealeddata(message: *const u8, message_len: usize) -> s
         }
     };
 
-    let mut sealed_log_arr: [u8; SEALED_LOG_SIZE] = [0; SEALED_LOG_SIZE];
-    let sealed_log = sealed_log_arr.as_mut_ptr();
-    let ret = unsafe {
-        sealed_data
-            .to_raw_sealed_data_t(sealed_log as *mut sgx_sealed_data_t, SEALED_LOG_SIZE as u32)
-    };
+    let mut sealed_log: [u8; SEALED_LOG_SIZE] = [0; SEALED_LOG_SIZE];
+    let p_sealed_log = sealed_log.as_mut_ptr() as *mut sgx_sealed_data_t;
+    let ret = unsafe { sealed_data.to_raw_sealed_data_t(p_sealed_log, SEALED_LOG_SIZE as u32) };
 
     if ret.is_none() {
         return sgx_status_t::SGX_ERROR_INVALID_PARAMETER;
     }
 
-    println!("{:?}", sealed_log_arr);
-
-    let raw_sealed_log = sealed_log as *const sgx_sealed_data_t;
+    println!("{:?}", sealed_log);
 
     unsafe {
         println!(
             "key_request.key_name: {}",
-            (*raw_sealed_log).key_request.key_name
+            (*p_sealed_log).key_request.key_name
         );
         println!(
             "key_request.key_policy: {}",
-            (*raw_sealed_log).key_request.key_policy
+            (*p_sealed_log).key_request.key_policy
         );
-        println!("plain_text_offset: {}", (*raw_sealed_log).plain_text_offset);
-        println!("payload_size: {}", (*raw_sealed_log).aes_data.payload_size);
+        println!("plain_text_offset: {}", (*p_sealed_log).plain_text_offset);
+        println!("payload_size: {}", (*p_sealed_log).aes_data.payload_size);
         println!(
             "payload_tag: {:?}",
-            (*raw_sealed_log).aes_data.payload_tag.to_vec()
+            (*p_sealed_log).aes_data.payload_tag.to_vec()
         );
     }
 
     let opt = unsafe {
-        SgxSealedData::<[u8]>::from_raw_sealed_data_t(
-            sealed_log as *mut sgx_sealed_data_t,
-            SEALED_LOG_SIZE as u32,
-        )
+        SgxSealedData::<[u8]>::from_raw_sealed_data_t(p_sealed_log, SEALED_LOG_SIZE as u32)
     };
     let sealed_data = match opt {
         Some(x) => x,
