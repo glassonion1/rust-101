@@ -112,7 +112,7 @@ $(RustEnclave_Name): enclave enclave/Enclave_t.o
 
 $(Signed_RustEnclave_Name): $(RustEnclave_Name)
 	mkdir -p bin
-	@$(SGX_ENCLAVE_SIGNER) sign -key enclave/Enclave_private.pem -enclave $(RustEnclave_Name) -out $@ -config enclave/Enclave.config.xml -dumpfile $(CUSTOM_BIN_PATH)/measurement.txt
+	@$(SGX_ENCLAVE_SIGNER) sign -key enclave/Enclave_private2.pem -enclave $(RustEnclave_Name) -out $@ -config enclave/Enclave.config.xml -dumpfile $(CUSTOM_BIN_PATH)/measurement.txt
 	@echo "SIGN =>  $@"
 
 .PHONY: enclave

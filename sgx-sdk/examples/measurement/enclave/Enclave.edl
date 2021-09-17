@@ -7,11 +7,9 @@ enclave
     trusted
     {
         /*These are ECALL defines.*/
-        public sgx_status_t ecall_ping([in, size=len] const uint8_t* message, size_t len);
+        public sgx_status_t ecall_ping([in, size=vote_len] const uint8_t* vote, size_t vote_len);
     };
     untrusted
     {
-        /*These are OCALL defines.*/
-        void ocall_pong([in, size=len] const uint8_t* message, size_t len);
     };
 };

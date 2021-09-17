@@ -1,21 +1,14 @@
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
-use std::slice;
 
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
-
-#[no_mangle]
-pub extern "C" fn ocall_pong(message: *const u8, len: usize) {
-    let str_slice = unsafe { slice::from_raw_parts(message, len) };
-    println!("{}", String::from_utf8(str_slice.to_vec()).unwrap());
-}
 
 extern "C" {
     fn ecall_ping(
         eid: sgx_enclave_id_t,
         retval: *mut sgx_status_t,
-        message: *const u8,
-        len: usize,
+        vote: *const u8,
+        vote_len: usize,
     ) -> sgx_status_t;
 }
 
@@ -51,14 +44,14 @@ fn main() {
     };
 
     let mut retval = sgx_status_t::SGX_SUCCESS;
-    let msg = String::from("ping");
+    let vote = String::from("natsuko");
 
     let result = unsafe {
         ecall_ping(
             enclave.geteid(),
             &mut retval,
-            msg.as_ptr() as *const u8,
-            msg.len(),
+            vote.as_ptr() as *const u8,
+            vote.len(),
         )
     };
     if result != sgx_status_t::SGX_SUCCESS {
@@ -71,6 +64,6 @@ fn main() {
         return;
     }
 
-    println!("[+] greeter success...");
+    println!("[+] measurement success...");
     enclave.destroy();
 }

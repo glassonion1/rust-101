@@ -7,25 +7,50 @@
 #[macro_use]
 extern crate sgx_tstd;
 
-use sgx_tstd::{slice, string::String};
+use sgx_tstd::{slice, string::String, vec::Vec};
 use sgx_types::sgx_status_t;
 
-extern "C" {
-    // OCALLS
-    pub fn ocall_pong(message: *const u8, len: usize);
-}
+const TARO: &str = "taro";
+const HANAKO: &str = "hanako";
+const NATSUKO: &str = "natsuko";
 
 #[no_mangle]
-pub extern "C" fn ecall_ping(message: *const u8, len: usize) -> sgx_status_t {
-    let str_slice = unsafe { slice::from_raw_parts(message, len) };
+pub extern "C" fn ecall_ping(vote: *const u8, vote_len: usize) -> sgx_status_t {
+    let vote_slice = unsafe { slice::from_raw_parts(vote, vote_len) };
 
-    let message = String::from_utf8(str_slice.to_vec()).unwrap();
-    println!("{}", message);
+    let vote = String::from_utf8(vote_slice.to_vec()).unwrap();
+    println!("I vote {}.", vote);
 
-    let msg = String::from(message + " pong");
-    unsafe {
-        ocall_pong(msg.as_ptr() as *const u8, msg.len());
+    let candidates = vec![TARO, HANAKO, NATSUKO];
+    let len = 99;
+    let mut votes: Vec<&str> = Vec::with_capacity(len);
+    for i in 0..len {
+        let c = candidates[i % 3];
+        votes.push(c);
     }
+
+    votes.push(&vote);
+
+    let mut result_taro = 0;
+    let mut result_hanako = 0;
+    let mut result_natsuko = 0;
+
+    // Summarize
+    for v in votes {
+        if v == TARO {
+            result_taro += 1;
+        }
+        if v == HANAKO {
+            result_hanako += 1;
+        }
+        if v == NATSUKO {
+            result_natsuko += 1;
+        }
+    }
+
+    println!("taro: {}", result_taro);
+    println!("hanako: {}", result_hanako);
+    println!("natsuko: {}", result_natsuko);
 
     sgx_status_t::SGX_SUCCESS
 }
