@@ -14,13 +14,7 @@ const TARO: &str = "taro";
 const HANAKO: &str = "hanako";
 const NATSUKO: &str = "natsuko";
 
-#[no_mangle]
-pub extern "C" fn ecall_ping(vote: *const u8, vote_len: usize) -> sgx_status_t {
-    let vote_slice = unsafe { slice::from_raw_parts(vote, vote_len) };
-
-    let vote = String::from_utf8(vote_slice.to_vec()).unwrap();
-    println!("I vote {}.", vote);
-
+fn get_votings() -> Vec<&'static str> {
     let candidates = vec![TARO, HANAKO, NATSUKO];
     let len = 99;
     let mut votes: Vec<&str> = Vec::with_capacity(len);
@@ -29,14 +23,26 @@ pub extern "C" fn ecall_ping(vote: *const u8, vote_len: usize) -> sgx_status_t {
         votes.push(c);
     }
 
-    votes.push(&vote);
+    votes
+}
+
+#[no_mangle]
+pub extern "C" fn ecall_vote(ballot: *const u8, ballot_len: usize) -> sgx_status_t {
+    let ballot_slice = unsafe { slice::from_raw_parts(ballot, ballot_len) };
+
+    let ballot = String::from_utf8(ballot_slice.to_vec()).unwrap();
+    println!("I vote {}.", ballot);
+
+    let mut votings = get_votings();
+
+    votings.push(&ballot);
 
     let mut result_taro = 0;
     let mut result_hanako = 0;
     let mut result_natsuko = 0;
 
     // Summarize
-    for v in votes {
+    for v in votings {
         if v == TARO {
             result_taro += 1;
         }

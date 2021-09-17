@@ -4,11 +4,11 @@ use sgx_urts::SgxEnclave;
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 
 extern "C" {
-    fn ecall_ping(
+    fn ecall_vote(
         eid: sgx_enclave_id_t,
         retval: *mut sgx_status_t,
-        vote: *const u8,
-        vote_len: usize,
+        ballot: *const u8,
+        ballot_len: usize,
     ) -> sgx_status_t;
 }
 
@@ -44,14 +44,14 @@ fn main() {
     };
 
     let mut retval = sgx_status_t::SGX_SUCCESS;
-    let vote = String::from("natsuko");
+    let ballot = String::from("natsuko");
 
     let result = unsafe {
-        ecall_ping(
+        ecall_vote(
             enclave.geteid(),
             &mut retval,
-            vote.as_ptr() as *const u8,
-            vote.len(),
+            ballot.as_ptr() as *const u8,
+            ballot.len(),
         )
     };
     if result != sgx_status_t::SGX_SUCCESS {
