@@ -169,7 +169,7 @@ pub fn verify_ra_cert(cert_der: &[u8]) -> Result<(), sgx_status_t> {
     // Extract each field
     let mut iter = payload.split(|x| *x == 0x7C);
     let attn_report_raw = iter.next().unwrap();
-    let attn_report = base64::decode(&attn_report_raw).unwrap();
+    let attn_report = attn_report_raw.to_vec();
     let sig_raw = iter.next().unwrap();
     let sig = base64::decode(&sig_raw).unwrap();
 

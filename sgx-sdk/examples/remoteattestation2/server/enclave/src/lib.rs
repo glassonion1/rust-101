@@ -83,7 +83,7 @@ fn create_attestation_report(
     spid: sgx_spid_t,
     pub_k: &sgx_ec256_public_t,
     sign_type: sgx_quote_sign_type_t,
-) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), sgx_status_t> {
+) -> Result<(String, String, String), sgx_status_t> {
     let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
     let mut ti: sgx_target_info_t = sgx_target_info_t::default();
     let mut eg: sgx_epid_group_id_t = sgx_epid_group_id_t::default();
@@ -229,10 +229,6 @@ pub extern "C" fn verify(socket_fd: c_int, sign_type: sgx_quote_sign_type_t) -> 
                 return e;
             }
         };
-
-    let attn_report = String::from_utf8(attn_report).unwrap();
-    let sig = String::from_utf8(sig).unwrap();
-    let cert = String::from_utf8(cert).unwrap();
 
     let payload = attn_report + "|" + &sig + "|" + &cert;
     let (key_der, cert_der) = match cert::gen_ecc_cert(payload, &prv_k, &pub_k, &ecc_handle) {
