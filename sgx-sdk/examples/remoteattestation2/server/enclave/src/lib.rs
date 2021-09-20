@@ -46,13 +46,6 @@ extern "C" {
         maxlen: u32,
         p_quote_len: *mut u32,
     ) -> sgx_status_t;
-    // Optional
-    pub fn ocall_get_update_info(
-        ret_val: *mut sgx_status_t,
-        platformBlob: *const sgx_platform_info_t,
-        enclaveTrusted: i32,
-        update_info: *mut sgx_update_info_bit_t,
-    ) -> sgx_status_t;
 }
 
 pub fn decode_spid(hex: &str) -> sgx_spid_t {
@@ -209,7 +202,10 @@ fn create_attestation_report(
 }
 
 #[no_mangle]
-pub extern "C" fn verify(socket_fd: c_int, sign_type: sgx_quote_sign_type_t) -> sgx_status_t {
+pub extern "C" fn run_server_session(
+    socket_fd: c_int,
+    sign_type: sgx_quote_sign_type_t,
+) -> sgx_status_t {
     println!("verify started");
 
     let ias_key = env::var("IAS_KEY").expect("IAS_KEY is not set");
@@ -240,7 +236,7 @@ pub extern "C" fn verify(socket_fd: c_int, sign_type: sgx_quote_sign_type_t) -> 
     };
     let _result = ecc_handle.close();
 
-    let root_ca_bin = include_bytes!("../ca.crt");
+    let root_ca_bin = include_bytes!("../../../cert/server_root_ca.crt");
     let mut ca_reader = BufReader::new(&root_ca_bin[..]);
     let mut rc_store = rustls::RootCertStore::empty();
 

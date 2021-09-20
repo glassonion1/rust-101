@@ -66,17 +66,8 @@ pub extern "C" fn ocall_get_quote(
     ret
 }
 
-#[no_mangle]
-pub extern "C" fn ocall_get_update_info(
-    platform_blob: *const sgx_platform_info_t,
-    enclave_trusted: i32,
-    update_info: *mut sgx_update_info_bit_t,
-) -> sgx_status_t {
-    unsafe { sgx_report_attestation_status(platform_blob, enclave_trusted, update_info) }
-}
-
 extern "C" {
-    fn verify(
+    fn run_server_session(
         eid: sgx_enclave_id_t,
         retval: *mut sgx_status_t,
         socket_fd: c_int,
@@ -124,8 +115,9 @@ fn main() {
             let mut retval = sgx_status_t::SGX_SUCCESS;
             let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
 
-            let result =
-                unsafe { verify(enclave.geteid(), &mut retval, socket.as_raw_fd(), sign_type) };
+            let result = unsafe {
+                run_server_session(enclave.geteid(), &mut retval, socket.as_raw_fd(), sign_type)
+            };
             if result != sgx_status_t::SGX_SUCCESS {
                 println!("[-] ECALL Enclave Failed {}!", result.as_str());
                 return;

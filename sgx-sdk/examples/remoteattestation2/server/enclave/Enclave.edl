@@ -12,7 +12,10 @@ enclave
 
     trusted
     {
-        public sgx_status_t verify(int fd, sgx_quote_sign_type_t quote_type);
+        public sgx_status_t run_server_session(
+            int fd,
+            sgx_quote_sign_type_t quote_type
+        );
     };
     untrusted
     {
@@ -31,12 +34,6 @@ enclave
             [out, size = maxlen] sgx_quote_t *p_quote,
             uint32_t maxlen,
             [out] uint32_t* p_quote_len
-        );
-        /* Optional */
-        sgx_status_t ocall_get_update_info(
-            [in] sgx_platform_info_t * platformBlob,
-            int32_t enclaveTrusted,
-            [out] sgx_update_info_bit_t * update_info
         );
     };
 };

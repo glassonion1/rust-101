@@ -3,18 +3,20 @@ use std::net::TcpStream;
 use std::str;
 use std::sync::Arc;
 
-const SERVERADDR: &str = "localhost:3443";
+const SERVER_HOST: &str = "localhost";
+const SERVER_PORT: &str = "3443";
 
-mod auth;
 mod cert;
+mod pib;
+mod verifier;
 
 fn make_config() -> rustls::ClientConfig {
     let mut config = rustls::ClientConfig::new();
 
-    let client_cert = include_bytes!("../cert/client.crt");
+    let client_cert = include_bytes!("../../cert/client.crt");
     let mut cc_reader = BufReader::new(&client_cert[..]);
 
-    let client_pkcs8_key = include_bytes!("../cert/client.pkcs8");
+    let client_pkcs8_key = include_bytes!("../../cert/client.pkcs8");
     let mut client_key_reader = BufReader::new(&client_pkcs8_key[..]);
 
     let certs = rustls::internal::pemfile::certs(&mut cc_reader).unwrap();
@@ -26,7 +28,7 @@ fn make_config() -> rustls::ClientConfig {
 
     config
         .dangerous()
-        .set_certificate_verifier(Arc::new(auth::ServerAuth::new(true)));
+        .set_certificate_verifier(Arc::new(verifier::ServerVerifier::new(true)));
     config.versions.clear();
     config.versions.push(rustls::ProtocolVersion::TLSv1_3);
 
@@ -35,13 +37,16 @@ fn make_config() -> rustls::ClientConfig {
 
 fn main() {
     println!("Starting ra-client");
-    println!("Connecting to {}", SERVERADDR);
+
+    let addr = format!("{}:{}", SERVER_HOST, SERVER_PORT);
+
+    println!("Connecting to {}", addr);
 
     let client_config = make_config();
-    let dns_name = webpki::DNSNameRef::try_from_ascii_str("localhost").unwrap();
+    let dns_name = webpki::DNSNameRef::try_from_ascii_str(SERVER_HOST).unwrap();
     let mut sess = rustls::ClientSession::new(&Arc::new(client_config), dns_name);
 
-    let mut conn = TcpStream::connect(SERVERADDR).unwrap();
+    let mut conn = TcpStream::connect(addr).unwrap();
 
     let mut tls = rustls::Stream::new(&mut sess, &mut conn);
 

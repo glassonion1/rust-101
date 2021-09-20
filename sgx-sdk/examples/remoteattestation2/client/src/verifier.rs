@@ -1,17 +1,17 @@
 use crate::cert::verify_ra_cert;
 use sgx_types::*;
 
-pub struct ServerAuth {
+pub struct ServerVerifier {
     outdated_ok: bool,
 }
 
-impl ServerAuth {
-    pub fn new(outdated_ok: bool) -> ServerAuth {
-        ServerAuth { outdated_ok }
+impl ServerVerifier {
+    pub fn new(outdated_ok: bool) -> ServerVerifier {
+        ServerVerifier { outdated_ok }
     }
 }
 
-impl rustls::ServerCertVerifier for ServerAuth {
+impl rustls::ServerCertVerifier for ServerVerifier {
     fn verify_server_cert(
         &self,
         _roots: &rustls::RootCertStore,

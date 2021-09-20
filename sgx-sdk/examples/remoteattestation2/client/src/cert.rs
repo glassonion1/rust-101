@@ -3,6 +3,8 @@ use sgx_types::*;
 use std::ptr;
 use std::time::SystemTime;
 
+use crate::pib::platform_info;
+
 type SignatureAlgorithms = &'static [&'static webpki::SignatureAlgorithm];
 static SUPPORTED_SIG_ALGS: SignatureAlgorithms = &[
     &webpki::ECDSA_P256_SHA256,
@@ -31,7 +33,7 @@ fn verify_intel_sign(
         }
     };
 
-    let root_ca_raw = include_bytes!("../cert/AttestationReportSigningCACert.pem");
+    let root_ca_raw = include_bytes!("../../cert/AttestationReportSigningCACert.pem");
     let root_ca_pem = pem::parse(root_ca_raw).expect("failed to parse pem file.");
     let root_ca = root_ca_pem.contents;
 
@@ -97,8 +99,9 @@ fn get_quote_from_attn_report(attn_report: Vec<u8>) -> Result<sgx_quote_t, sgx_s
             "OK" => (),
             "GROUP_OUT_OF_DATE" | "GROUP_REVOKED" | "CONFIGURATION_NEEDED" => {
                 // Verify platformInfoBlob for further info if status not OK
-                // This is optional
                 if let Value::String(pib) = &attn_report["platformInfoBlob"] {
+                    let got_pib = platform_info::from_str(&pib);
+                    println!("{:?}", got_pib);
                 } else {
                     println!("Failed to fetch platformInfoBlob from attestation report");
                     return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
@@ -170,6 +173,7 @@ pub fn verify_ra_cert(cert_der: &[u8]) -> Result<(), sgx_status_t> {
     let mut iter = payload.split(|x| *x == 0x7C);
     let attn_report_raw = iter.next().unwrap();
     let attn_report = attn_report_raw.to_vec();
+
     let sig_raw = iter.next().unwrap();
     let sig = base64::decode(&sig_raw).unwrap();
 
