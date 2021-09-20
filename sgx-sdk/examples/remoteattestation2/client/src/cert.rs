@@ -31,7 +31,7 @@ fn verify_intel_sign(
         }
     };
 
-    let root_ca_raw = include_bytes!("../cert/ca.crt");
+    let root_ca_raw = include_bytes!("../cert/AttestationReportSigningCACert.pem");
     let root_ca_pem = pem::parse(root_ca_raw).expect("failed to parse pem file.");
     let root_ca = root_ca_pem.contents;
 

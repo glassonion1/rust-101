@@ -28,7 +28,7 @@ fn make_config() -> rustls::ClientConfig {
         .dangerous()
         .set_certificate_verifier(Arc::new(auth::ServerAuth::new(true)));
     config.versions.clear();
-    config.versions.push(rustls::ProtocolVersion::TLSv1_2);
+    config.versions.push(rustls::ProtocolVersion::TLSv1_3);
 
     config
 }
