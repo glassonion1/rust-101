@@ -1,6 +1,7 @@
-use serde_json::Value;
 use sgx_tstd::{ptr, string::String, time::SystemTime, vec::Vec};
-use sgx_types::*;
+use sgx_types::{sgx_quote_t, sgx_status_t};
+
+use serde_json::Value;
 
 type SignatureAlgorithms = &'static [&'static webpki::SignatureAlgorithm];
 static SUPPORTED_SIG_ALGS: SignatureAlgorithms = &[
@@ -30,7 +31,7 @@ fn verify_intel_sign(
         }
     };
 
-    let root_ca_raw = include_bytes!("../../../cert/AttestationReportSigningCACert.pem");
+    let root_ca_raw = include_bytes!("../AttestationReportSigningCACert.pem");
     let root_ca_pem = pem::parse(root_ca_raw).expect("failed to parse pem file.");
     let root_ca = root_ca_pem.contents;
 

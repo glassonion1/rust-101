@@ -6,14 +6,9 @@
 #[cfg(not(target_env = "sgx"))]
 #[macro_use]
 extern crate sgx_tstd;
-extern crate base64;
-extern crate http_req;
-extern crate rustls;
-extern crate sgx_rand;
-
-use crate::sgx_rand::Rng;
 
 use hex;
+use sgx_rand::Rng;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
 use sgx_tstd::io::{self, Read, Write};
@@ -21,10 +16,9 @@ use sgx_tstd::{env, ptr, str, string::String, vec::Vec};
 use sgx_tstd::{net::TcpStream, sync::Arc};
 use sgx_types::*;
 
-mod cert;
-mod client;
-mod verification;
-mod verifier;
+use attestation::ecdsa;
+use attestation::ias::Client;
+use attestation::verifier::ServerVerifier;
 
 extern "C" {
     pub fn ocall_sgx_init_quote(
@@ -71,7 +65,7 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 }
 
 fn create_attestation_report(
-    ias_key: &str,
+    ias_key: String,
     spid: sgx_spid_t,
     pub_k: &sgx_ec256_public_t,
     sign_type: sgx_quote_sign_type_t,
@@ -96,11 +90,13 @@ fn create_attestation_report(
         return Err(rt);
     }
 
+    let client = Client::new(ias_key);
+
     let eg_num = as_u32_le(&eg);
-    let sigrl_vec = match client::get_sigrl_from_intel(ias_key, eg_num) {
+    let sigrl_vec = match client.get_sigrl(eg_num) {
         Ok(r) => r,
         Err(e) => {
-            println!("client::get_sigrl_from_intel failed with {:?}", e);
+            println!("client.get_sigrl failed with {:?}", e);
             return Err(e);
         }
     };
@@ -191,10 +187,10 @@ fn create_attestation_report(
     }
 
     let quote_vec: Vec<u8> = return_quote_buf[..quote_len as usize].to_vec();
-    match client::post_report_to_intel(ias_key, quote_vec) {
+    match client.post_report(quote_vec) {
         Ok(r) => Ok(r),
         Err(e) => {
-            println!("client::post_report_to_intel failed with {:?}", e);
+            println!("client.post_report failed with {:?}", e);
             return Err(e);
         }
     }
@@ -216,17 +212,17 @@ pub extern "C" fn run_client_session(
     let _result = ecc_handle.open();
     let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
 
-    let (attn_report, sig, cert) =
-        match create_attestation_report(&ias_key, spid, &pub_k, sign_type) {
-            Ok(r) => r,
-            Err(e) => {
-                println!("Error in create_attestation_report: {:?}", e);
-                return e;
-            }
-        };
+    let (attn_report, sig, cert) = match create_attestation_report(ias_key, spid, &pub_k, sign_type)
+    {
+        Ok(r) => r,
+        Err(e) => {
+            println!("Error in create_attestation_report: {:?}", e);
+            return e;
+        }
+    };
 
     let payload = attn_report + "|" + &sig + "|" + &cert;
-    let (key_der, cert_der) = match cert::gen_ecc_cert(payload, &prv_k, &pub_k, &ecc_handle) {
+    let (key_der, cert_der) = match ecdsa::gen_ecc_cert(payload, &prv_k, &pub_k, &ecc_handle) {
         Ok(r) => r,
         Err(e) => {
             println!("Error in gen_ecc_cert: {:?}", e);
@@ -242,7 +238,7 @@ pub extern "C" fn run_client_session(
 
     cfg.set_single_client_cert(certs, privkey).unwrap();
     cfg.dangerous()
-        .set_certificate_verifier(Arc::new(verifier::ServerVerifier::new(true)));
+        .set_certificate_verifier(Arc::new(ServerVerifier::new(true)));
     cfg.versions.clear();
     cfg.versions.push(rustls::ProtocolVersion::TLSv1_3);
 

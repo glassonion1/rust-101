@@ -9,6 +9,7 @@ name = "remoteattestationenclave"
 crate-type = ["staticlib"]
 
 [dependencies]
+attestation = {path = "../../attestation/"}
 sgx_types = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3" }
 sgx_tstd = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", features = ["net"] }
 sgx_trts = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3" }
@@ -16,21 +17,8 @@ sgx_tse = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.
 sgx_tcrypto = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3" }
 sgx_rand = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3" }
 webpki = { git = "https://github.com/mesalock-linux/webpki", branch = "mesalock_sgx" }
-webpki-roots = { git = "https://github.com/mesalock-linux/webpki-roots", branch = "mesalock_sgx" }
-http_req = { git = "https://github.com/mesalock-linux/http_req-sgx", rev = "sgx_1.1.3" }
-base64 = { git = "https://github.com/mesalock-linux/rust-base64-sgx" }
 hex = { git = "https://github.com/mesalock-linux/rust-hex-sgx", rev = "sgx_1.1.3", default-features = false }
-pem = { version = "0.8.2", git = "https://github.com/mesalock-linux/pem-rs-sgx" }
-chrono = { git = "https://github.com/mesalock-linux/chrono-sgx" }
-yasna = { git = "https://github.com/mesalock-linux/yasna.rs-sgx", features = ["bit-vec", "num-bigint", "chrono"] }
-num-bigint = { git = "https://github.com/mesalock-linux/num-bigint-sgx" }
-bit-vec = { version = "*", default-features = false}
-serde_json = { git = "https://github.com/mesalock-linux/serde-json-sgx", rev = "sgx_1.1.3" }
-
-[dependencies.rustls]
-git = "https://github.com/mesalock-linux/rustls"
-branch = "mesalock_sgx"
-features = ["dangerous_configuration"]
+rustls = { git = "https://github.com/mesalock-linux/rustls", branch = "mesalock_sgx" }
 
 [features]
 default = []
