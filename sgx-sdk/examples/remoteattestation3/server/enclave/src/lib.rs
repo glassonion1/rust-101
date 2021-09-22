@@ -8,6 +8,7 @@
 extern crate sgx_tstd;
 extern crate base64;
 extern crate http_req;
+extern crate rustls;
 extern crate sgx_rand;
 
 use crate::sgx_rand::Rng;
@@ -15,17 +16,15 @@ use crate::sgx_rand::Rng;
 use hex;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_tstd::io::{BufReader, Read, Write};
-use sgx_tstd::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
+use sgx_tstd::io::{Read, Write};
 use sgx_tstd::{env, ptr, str, string::String, vec::Vec};
 use sgx_tstd::{net::TcpStream, sync::Arc};
 use sgx_types::*;
 
 mod cert;
 mod client;
+mod verification;
+mod verifier;
 
 extern "C" {
     pub fn ocall_sgx_init_quote(
@@ -236,16 +235,7 @@ pub extern "C" fn run_server_session(
     };
     let _result = ecc_handle.close();
 
-    let root_ca_bin = include_bytes!("../../../cert/root_ca.crt");
-    let mut ca_reader = BufReader::new(&root_ca_bin[..]);
-    let mut rc_store = rustls::RootCertStore::empty();
-
-    // Build a root ca storage
-    rc_store.add_pem_file(&mut ca_reader).unwrap();
-
-    // Build a default authenticator which allow every authenticated client
-    let authenticator = rustls::AllowAnyAuthenticatedClient::new(rc_store);
-    let mut cfg = rustls::ServerConfig::new(authenticator);
+    let mut cfg = rustls::ServerConfig::new(Arc::new(verifier::ClientVerifier::new(true)));
     let mut certs = Vec::new();
     certs.push(rustls::Certificate(cert_der));
     let privkey = rustls::PrivateKey(key_der);
@@ -257,13 +247,9 @@ pub extern "C" fn run_server_session(
     let mut conn = TcpStream::new(socket_fd).unwrap();
 
     let mut tls = rustls::Stream::new(&mut sess, &mut conn);
-    let mut plaintext = [0u8; 1024];
+    let mut plaintext = [0u8; 1024]; //Vec::new();
     match tls.read(&mut plaintext) {
-        Ok(_) => {
-            let mut hasher = DefaultHasher::new();
-            Hash::hash_slice(&plaintext, &mut hasher);
-            println!("hash of data we get is : {:x}!", hasher.finish());
-        }
+        Ok(_) => println!("Client said: {}", str::from_utf8(&plaintext).unwrap()),
         Err(e) => {
             println!("Error in read_to_end: {:?}", e);
             panic!("");

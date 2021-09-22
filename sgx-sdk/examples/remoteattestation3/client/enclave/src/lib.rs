@@ -8,6 +8,7 @@
 extern crate sgx_tstd;
 extern crate base64;
 extern crate http_req;
+extern crate rustls;
 extern crate sgx_rand;
 
 use crate::sgx_rand::Rng;
@@ -15,17 +16,15 @@ use crate::sgx_rand::Rng;
 use hex;
 use sgx_tcrypto::SgxEccHandle;
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_tstd::io::{BufReader, Read, Write};
-use sgx_tstd::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
+use sgx_tstd::io::{self, Read, Write};
 use sgx_tstd::{env, ptr, str, string::String, vec::Vec};
 use sgx_tstd::{net::TcpStream, sync::Arc};
 use sgx_types::*;
 
 mod cert;
 mod client;
+mod verification;
+mod verifier;
 
 extern "C" {
     pub fn ocall_sgx_init_quote(
@@ -202,7 +201,7 @@ fn create_attestation_report(
 }
 
 #[no_mangle]
-pub extern "C" fn run_server_session(
+pub extern "C" fn run_client_session(
     socket_fd: c_int,
     sign_type: sgx_quote_sign_type_t,
 ) -> sgx_status_t {
@@ -236,41 +235,35 @@ pub extern "C" fn run_server_session(
     };
     let _result = ecc_handle.close();
 
-    let root_ca_bin = include_bytes!("../../../cert/root_ca.crt");
-    let mut ca_reader = BufReader::new(&root_ca_bin[..]);
-    let mut rc_store = rustls::RootCertStore::empty();
-
-    // Build a root ca storage
-    rc_store.add_pem_file(&mut ca_reader).unwrap();
-
-    // Build a default authenticator which allow every authenticated client
-    let authenticator = rustls::AllowAnyAuthenticatedClient::new(rc_store);
-    let mut cfg = rustls::ServerConfig::new(authenticator);
+    let mut cfg = rustls::ClientConfig::new();
     let mut certs = Vec::new();
     certs.push(rustls::Certificate(cert_der));
     let privkey = rustls::PrivateKey(key_der);
 
-    cfg.set_single_cert_with_ocsp_and_sct(certs, privkey, vec![], vec![])
-        .unwrap();
+    cfg.set_single_client_cert(certs, privkey).unwrap();
+    cfg.dangerous()
+        .set_certificate_verifier(Arc::new(verifier::ServerVerifier::new(true)));
+    cfg.versions.clear();
+    cfg.versions.push(rustls::ProtocolVersion::TLSv1_3);
 
-    let mut sess = rustls::ServerSession::new(&Arc::new(cfg));
+    let dns_name = webpki::DNSNameRef::try_from_ascii_str("localhost").unwrap();
+    let mut sess = rustls::ClientSession::new(&Arc::new(cfg), dns_name);
     let mut conn = TcpStream::new(socket_fd).unwrap();
 
     let mut tls = rustls::Stream::new(&mut sess, &mut conn);
-    let mut plaintext = [0u8; 1024];
-    match tls.read(&mut plaintext) {
-        Ok(_) => {
-            let mut hasher = DefaultHasher::new();
-            Hash::hash_slice(&plaintext, &mut hasher);
-            println!("hash of data we get is : {:x}!", hasher.finish());
-        }
-        Err(e) => {
-            println!("Error in read_to_end: {:?}", e);
-            panic!("");
-        }
-    };
 
-    tls.write("hello back".as_bytes()).unwrap();
+    tls.write("hello".as_bytes()).unwrap();
+
+    let mut plaintext = Vec::new();
+    match tls.read_to_end(&mut plaintext) {
+        Ok(_) => {
+            println!("Server replied: {}", str::from_utf8(&plaintext).unwrap());
+        }
+        Err(ref err) if err.kind() == io::ErrorKind::ConnectionAborted => {
+            println!("EOF (tls)");
+        }
+        Err(e) => println!("Error in read_to_end: {:?}", e),
+    }
 
     sgx_status_t::SGX_SUCCESS
 }
