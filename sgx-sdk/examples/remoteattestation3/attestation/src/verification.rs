@@ -1,7 +1,6 @@
-use sgx_tstd::{ptr, string::String, time::SystemTime, vec::Vec};
-use sgx_types::{sgx_quote_t, sgx_status_t};
-
 use serde_json::Value;
+use sgx_tstd::{ptr, string::String, time::SystemTime, vec::Vec};
+use sgx_types::{sgx_platform_info_t, sgx_quote_t, sgx_status_t, sgx_update_info_bit_t};
 
 type SignatureAlgorithms = &'static [&'static webpki::SignatureAlgorithm];
 static SUPPORTED_SIG_ALGS: SignatureAlgorithms = &[
@@ -17,6 +16,15 @@ static SUPPORTED_SIG_ALGS: SignatureAlgorithms = &[
     &webpki::RSA_PKCS1_2048_8192_SHA512,
     &webpki::RSA_PKCS1_3072_8192_SHA384,
 ];
+
+extern "C" {
+    pub fn ocall_get_update_info(
+        ret_val: *mut sgx_status_t,
+        platform_blob: *const sgx_platform_info_t,
+        enclave_trusted: i32,
+        update_info: *mut sgx_update_info_bit_t,
+    ) -> sgx_status_t;
+}
 
 fn verify_intel_sign(
     attn_report: Vec<u8>,
@@ -95,7 +103,43 @@ fn get_quote_from_attn_report(attn_report: Vec<u8>) -> Result<sgx_quote_t, sgx_s
     if let Value::String(quote_status) = &attn_report["isvEnclaveQuoteStatus"] {
         match quote_status.as_ref() {
             "OK" => (),
-            "GROUP_OUT_OF_DATE" | "GROUP_REVOKED" | "CONFIGURATION_NEEDED" => {}
+            "GROUP_OUT_OF_DATE" | "GROUP_REVOKED" | "CONFIGURATION_NEEDED" => {
+                // Verify platformInfoBlob for further info if status not OK
+                if let Value::String(pib) = &attn_report["platformInfoBlob"] {
+                    let mut buf = Vec::new();
+                    // the TLV Header (4 bytes/8 hexes) should be skipped
+                    let n = (pib.len() - 8) / 2;
+                    for i in 0..n {
+                        buf.push(u8::from_str_radix(&pib[(i * 2 + 8)..(i * 2 + 10)], 16).unwrap());
+                    }
+
+                    let mut update_info = sgx_update_info_bit_t::default();
+                    let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
+                    let res = unsafe {
+                        ocall_get_update_info(
+                            &mut rt as *mut sgx_status_t,
+                            buf.as_slice().as_ptr() as *const sgx_platform_info_t,
+                            1,
+                            &mut update_info as *mut sgx_update_info_bit_t,
+                        )
+                    };
+                    if res != sgx_status_t::SGX_SUCCESS {
+                        println!("res={:?}", res);
+                        return Err(res);
+                    }
+
+                    if rt != sgx_status_t::SGX_SUCCESS {
+                        println!("rt={:?}", rt);
+                        // Borrow of packed field is unsafe in future Rust releases
+                        unsafe {
+                            println!("update_info.pswUpdate: {}", update_info.pswUpdate);
+                            println!("update_info.csmeFwUpdate: {}", update_info.csmeFwUpdate);
+                            println!("update_info.ucodeUpdate: {}", update_info.ucodeUpdate);
+                        }
+                        //return Err(rt);
+                    }
+                }
+            }
             _ => return Err(sgx_status_t::SGX_ERROR_UNEXPECTED),
         }
     } else {

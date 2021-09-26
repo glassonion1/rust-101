@@ -8,6 +8,8 @@ enclave
     from "sgx_tstdc.edl" import *;
     from "sgx_env.edl" import *;
 
+    from "../attestation/attestation.edl" import *;
+
     include "sgx_quote.h"
 
     trusted

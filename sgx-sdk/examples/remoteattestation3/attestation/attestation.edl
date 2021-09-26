@@ -1,0 +1,23 @@
+enclave
+{
+    from "sgx_tstd.edl" import *;
+    from "sgx_stdio.edl" import *;
+    from "sgx_fs.edl" import *;
+    from "sgx_net.edl" import *;
+    from "sgx_time.edl" import *;
+    from "sgx_tstdc.edl" import *;
+
+    include "sgx_quote.h"
+    
+    trusted
+    {
+    };
+    untrusted
+    {
+        sgx_status_t ocall_get_update_info(
+            [in] sgx_platform_info_t * platform_blob,
+            int32_t enclave_trusted,
+            [out] sgx_update_info_bit_t * update_info
+        );
+    };
+};

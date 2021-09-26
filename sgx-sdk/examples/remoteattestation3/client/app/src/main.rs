@@ -66,6 +66,15 @@ pub extern "C" fn ocall_get_quote(
     ret
 }
 
+#[no_mangle]
+pub extern "C" fn ocall_get_update_info(
+    platform_blob: *const sgx_platform_info_t,
+    enclave_trusted: i32,
+    update_info: *mut sgx_update_info_bit_t,
+) -> sgx_status_t {
+    unsafe { sgx_report_attestation_status(platform_blob, enclave_trusted, update_info) }
+}
+
 extern "C" {
     fn run_client_session(
         eid: sgx_enclave_id_t,
