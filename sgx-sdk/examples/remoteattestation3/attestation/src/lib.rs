@@ -8,6 +8,7 @@
 #[macro_use]
 extern crate sgx_tstd;
 
+pub mod attestation_report;
 pub mod ecdsa;
 pub mod ias;
 mod verification;
