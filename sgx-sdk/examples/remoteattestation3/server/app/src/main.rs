@@ -1,5 +1,6 @@
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
+use std::io;
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
 
@@ -117,26 +118,36 @@ fn main() {
 
     println!("Running as server...");
     let listener = TcpListener::bind("0.0.0.0:3443").unwrap();
+    listener
+        .set_nonblocking(true)
+        .expect("Cannot set non-blocking");
 
-    match listener.accept() {
-        Ok((socket, addr)) => {
-            println!("new client from {:?}", addr);
-            let mut retval = sgx_status_t::SGX_SUCCESS;
-            let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
+    for stream in listener.incoming() {
+        match stream {
+            Ok(s) => {
+                println!("connects new client");
+                let mut retval = sgx_status_t::SGX_SUCCESS;
+                let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
 
-            let result = unsafe {
-                run_server_session(enclave.geteid(), &mut retval, socket.as_raw_fd(), sign_type)
-            };
-            if result != sgx_status_t::SGX_SUCCESS {
-                println!("[-] ECALL Enclave Failed {}!", result.as_str());
-                return;
+                let result = unsafe {
+                    run_server_session(enclave.geteid(), &mut retval, s.as_raw_fd(), sign_type)
+                };
+                if result != sgx_status_t::SGX_SUCCESS {
+                    println!("[-] ECALL Enclave Failed {}!", result.as_str());
+                    break;
+                }
+                if retval != sgx_status_t::SGX_SUCCESS {
+                    println!("[-] ECALL Enclave Failed {}!", retval.as_str());
+                    break;
+                }
             }
-            if retval != sgx_status_t::SGX_SUCCESS {
-                println!("[-] ECALL Enclave Failed {}!", retval.as_str());
-                return;
+            // Graceful exit.
+            // see: https://stackoverflow.com/questions/56692961/graceful-exit-tcplistener-incoming/56693740#56693740
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                break;
             }
+            Err(e) => println!("couldn't get client: {:?}", e),
         }
-        Err(e) => println!("couldn't get client: {:?}", e),
     }
 
     println!("[+] Done!");

@@ -81,7 +81,7 @@ fn verify_intel_sign(
     }
 }
 
-fn get_quote_from_attn_report(attn_report: Vec<u8>) -> Result<sgx_quote_t, sgx_status_t> {
+fn extract_quote_from_attn_report(attn_report: Vec<u8>) -> Result<sgx_quote_t, sgx_status_t> {
     let attn_report: Value = serde_json::from_slice(&attn_report).unwrap();
 
     // Check timestamp is within 24H
@@ -215,7 +215,7 @@ pub fn verify_ra_cert(cert_der: &[u8]) -> Result<(), sgx_status_t> {
 
     verify_intel_sign(attn_report.clone(), sig, cert)?;
 
-    let sgx_quote = get_quote_from_attn_report(attn_report)?;
+    let sgx_quote = extract_quote_from_attn_report(attn_report)?;
 
     // Borrow of packed field is unsafe in future Rust releases
     // ATTENTION
