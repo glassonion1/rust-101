@@ -1,9 +1,9 @@
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
-//use std::io;
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
 
+use crate::event_fd::{CancellableIncoming, EventFd};
 mod event_fd;
 
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
@@ -121,9 +121,9 @@ fn main() {
     println!("Running as server...");
 
     // https://stackoverflow.com/questions/56692961/graceful-exit-tcplistener-incoming
-    let shutdown = event_fd::EventFd::new();
+    let shutdown = EventFd::new();
     let listener = TcpListener::bind("0.0.0.0:3443").unwrap();
-    let incoming = event_fd::CancellableIncoming::new(&listener, &shutdown);
+    let incoming = CancellableIncoming::new(&listener, &shutdown);
 
     for stream in incoming {
         match stream {
@@ -144,7 +144,6 @@ fn main() {
                     return;
                 }
             }
-
             Err(e) => panic!("Unexpected error: {}", e),
         }
     }

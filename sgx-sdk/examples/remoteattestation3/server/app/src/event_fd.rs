@@ -1,6 +1,6 @@
-use nix::poll::{poll, PollFd, PollFlags};
-use nix::sys::eventfd::{eventfd, EfdFlags};
-use nix::unistd::{close, write};
+use nix::poll::{self, PollFd, PollFlags};
+use nix::sys::eventfd::{self, EfdFlags};
+use nix::unistd;
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::{AsRawFd, RawFd};
 
@@ -11,13 +11,13 @@ pub struct EventFd {
 impl EventFd {
     pub fn new() -> Self {
         EventFd {
-            fd: eventfd(0, EfdFlags::empty()).unwrap(),
+            fd: eventfd::eventfd(0, EfdFlags::empty()).unwrap(),
         }
     }
 
     pub fn add(&self, v: i64) -> nix::Result<usize> {
         let b = v.to_le_bytes();
-        write(self.fd, &b)
+        unistd::write(self.fd, &b)
     }
 }
 
@@ -29,7 +29,7 @@ impl AsRawFd for EventFd {
 
 impl Drop for EventFd {
     fn drop(&mut self) {
-        let _ = close(self.fd);
+        let _ = unistd::close(self.fd);
     }
 }
 
@@ -55,7 +55,7 @@ impl<'a> Iterator for CancellableIncoming<'a> {
         ];
 
         loop {
-            match poll(&mut poll_fds, -1) {
+            match poll::poll(&mut poll_fds, -1) {
                 Ok(_) => break,
                 Err(nix::Error::EINTR) => continue,
                 _ => panic!("Error polling"),
