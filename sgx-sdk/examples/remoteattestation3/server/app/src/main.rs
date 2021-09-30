@@ -1,8 +1,10 @@
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
-use std::io;
+//use std::io;
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
+
+mod event_fd;
 
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 
@@ -117,38 +119,44 @@ fn main() {
     };
 
     println!("Running as server...");
-    let listener = TcpListener::bind("0.0.0.0:3443").unwrap();
-    listener
-        .set_nonblocking(true)
-        .expect("Cannot set non-blocking");
 
-    for stream in listener.incoming() {
+    // https://stackoverflow.com/questions/56692961/graceful-exit-tcplistener-incoming
+    let shutdown = event_fd::EventFd::new();
+    let listener = TcpListener::bind("0.0.0.0:3443").unwrap();
+    let incoming = event_fd::CancellableIncoming::new(&listener, &shutdown);
+
+    for stream in incoming {
         match stream {
-            Ok(s) => {
+            Ok(socket) => {
                 println!("connects new client");
                 let mut retval = sgx_status_t::SGX_SUCCESS;
                 let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
 
                 let result = unsafe {
-                    run_server_session(enclave.geteid(), &mut retval, s.as_raw_fd(), sign_type)
+                    run_server_session(enclave.geteid(), &mut retval, socket.as_raw_fd(), sign_type)
                 };
                 if result != sgx_status_t::SGX_SUCCESS {
                     println!("[-] ECALL Enclave Failed {}!", result.as_str());
-                    break;
+                    return;
                 }
                 if retval != sgx_status_t::SGX_SUCCESS {
                     println!("[-] ECALL Enclave Failed {}!", retval.as_str());
-                    break;
+                    return;
                 }
             }
-            // Graceful exit.
-            // see: https://stackoverflow.com/questions/56692961/graceful-exit-tcplistener-incoming/56693740#56693740
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                break;
-            }
-            Err(e) => println!("couldn't get client: {:?}", e),
+
+            Err(e) => panic!("Unexpected error: {}", e),
         }
     }
+
+    match shutdown.add(1) {
+        Ok(s) => {
+            println!("{}", s);
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
+    };
 
     println!("[+] Done!");
     enclave.destroy();
