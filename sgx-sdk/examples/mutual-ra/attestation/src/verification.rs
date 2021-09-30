@@ -136,7 +136,7 @@ fn extract_quote_from_attn_report(attn_report: Vec<u8>) -> Result<sgx_quote_t, s
                             println!("update_info.csmeFwUpdate: {}", update_info.csmeFwUpdate);
                             println!("update_info.ucodeUpdate: {}", update_info.ucodeUpdate);
                         }
-                        //return Err(rt);
+                        return Err(rt);
                     }
                 }
             }
