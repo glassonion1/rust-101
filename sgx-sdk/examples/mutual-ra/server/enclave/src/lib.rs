@@ -39,8 +39,6 @@ pub extern "C" fn run_server_session(
     socket_fd: c_int,
     sign_type: sgx_quote_sign_type_t,
 ) -> sgx_status_t {
-    println!("verify started");
-
     let ias_key = env::var("IAS_KEY").expect("IAS_KEY is not set");
     let spid_env = env::var("SPID").expect("SPID is not set");
     let spid = decode_spid(&spid_env);
@@ -69,11 +67,12 @@ pub extern "C" fn run_server_session(
     };
     let _result = ecc_handle.close();
 
+    // create server config by setting ClientVerifier object as an argument
     let mut cfg = rustls::ServerConfig::new(Arc::new(ClientVerifier::new(true)));
+    // set the server cert on config
     let mut certs = Vec::new();
     certs.push(rustls::Certificate(cert_der));
     let privkey = rustls::PrivateKey(key_der);
-
     cfg.set_single_cert_with_ocsp_and_sct(certs, privkey, vec![], vec![])
         .unwrap();
 
@@ -81,7 +80,7 @@ pub extern "C" fn run_server_session(
     let mut conn = TcpStream::new(socket_fd).unwrap();
 
     let mut tls = rustls::Stream::new(&mut sess, &mut conn);
-    let mut plaintext = [0u8; 1024]; //Vec::new();
+    let mut plaintext = [0u8; 1024];
     match tls.read(&mut plaintext) {
         Ok(_) => println!("Client said: {}", str::from_utf8(&plaintext).unwrap()),
         Err(e) => {
