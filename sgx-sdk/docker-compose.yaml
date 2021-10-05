@@ -1,11 +1,11 @@
 version: "3"
 services:
   sgx:
-    image: baiduxlab/sgx-rust:latest
-    volumes:
-      - .:/root/sgx
+    build: .
     environment:
       LD_LIBRARY_PATH: "/opt/intel/sgx-aesm-service/aesm"
+    volumes:
+      - ./examples:/root/sgx/examples
     #devices:
     #  - "/dev/sgx/enclave"
     stdin_open: true

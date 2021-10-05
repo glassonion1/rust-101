@@ -27,8 +27,8 @@ SGX_COMMON_CFLAGS += -fstack-protector
 
 CUSTOM_LIBRARY_PATH := ./lib
 CUSTOM_BIN_PATH := ./bin
-CUSTOM_EDL_PATH := $(TOP_DIR)/edl
-CUSTOM_COMMON_PATH := $(TOP_DIR)/common
+CUSTOM_EDL_PATH := $(TOP_DIR)/sgx_edl/edl
+CUSTOM_COMMON_PATH := $(TOP_DIR)/sgx_edl/common
 
 ######## EDL Settings ########
 
