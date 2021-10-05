@@ -1,13 +1,19 @@
 # Rust SGX SDK Samples
 Code samples using [incubator-teaclave-sgx-sdk](https://github.com/apache/incubator-teaclave-sgx-sdk).
 
-## Directories
-- common
-  - Copied from incubator-teaclave-sgx-sdk. Required when compiling code.
-- edl
-  - Copied from incubator-teaclave-sgx-sdk. Required when compiling code.
-- examples
-  - Example codes using incubator-teaclave-sgx-sdk.
+## Examples
+- crypto_box
+- crypto_box2
+- crypto_box3
+- crypto_box4
+- greeter
+- measurement
+- mutual-ra
+- remoteattestation
+- remoteattestation2
+- sealeddata
+- sealeddata2
+- sealeddata3
 
 ## Build and Run codes
 Run a docker container based on the `baiduxlab/sgx-rust` image.
