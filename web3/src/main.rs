@@ -14,7 +14,7 @@ async fn main() -> web3::contract::Result<()> {
     let contract = Contract::from_json(
         web3.eth(),
         contract_addr,
-        include_bytes!("../contract-abi/storage.json"),
+        include_bytes!("../contract/abi/storage.json"),
     )
     .unwrap();
 
