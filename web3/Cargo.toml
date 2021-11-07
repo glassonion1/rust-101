@@ -1,0 +1,9 @@
+[package]
+name = "web3_sample"
+version = "0.0.1"
+authors = ["glassonion1 <glassonion999@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tokio = { version = "1.13.0", features = ["full"] }
+web3 = "0.17.0"
