@@ -1,0 +1,19 @@
+[package]
+name = "blockchainenclave"
+version = "0.0.1"
+authors = ["glassonion1 <glassonion999@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "blockchainenclave"
+crate-type = ["staticlib"]
+
+[dependencies]
+sgx_types = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3" }
+sgx_tstd = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", features = ["backtrace"] }
+sgx_trts = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3"}
+crypto_box = "0.6.1"
+once_cell = {git = "https://github.com/mesalock-linux/once_cell-sgx" }
+
+[features]
+default = []

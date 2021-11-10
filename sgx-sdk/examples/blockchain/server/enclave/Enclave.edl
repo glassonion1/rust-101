@@ -1,0 +1,27 @@
+enclave
+{
+    from "sgx_tstd.edl" import *;
+    from "sgx_stdio.edl" import *;
+    from "sgx_backtrace.edl" import *;
+    from "sgx_tstdc.edl" import *;
+
+    trusted
+    {
+        /*These are ECALL defines.*/
+        public sgx_status_t ecall_get_encryption_key(
+            [out, size=out_pubkey_len] uint8_t* out_pubkey,
+            size_t out_pubkey_len
+        );
+        public sgx_status_t ecall_decrypt(
+            [in, size=in_nonce_len] uint8_t* in_nonce,
+            size_t in_nonce_len,
+            [in, size=in_pubkey_len] uint8_t* in_pubkey,
+            size_t in_pubkey_len,
+            [in, size=in_ciphertext_len] uint8_t* in_ciphertext,
+            size_t in_ciphertext_len
+        );
+    };
+    untrusted
+    {
+    };
+};
