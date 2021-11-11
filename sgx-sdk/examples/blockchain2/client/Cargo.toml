@@ -2,7 +2,7 @@
 name = "blockchain_client"
 version = "0.0.1"
 authors = ["glassonion1 <glassonion999@gmail.com>"]
-edition = "2021"
+edition = "2018"
 
 [dependencies]
 crypto_box = "0.6.1"

@@ -1,14 +1,9 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Result;
-use crypto_box::{
-    aead::{Aead, Payload},
-    ChaChaBox, PublicKey, SecretKey,
-};
 use serde::{Deserialize, Serialize};
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
 use std::convert::TryInto;
-use std::io::Read;
 use std::str::FromStr;
 use web3::contract::{Contract, Options};
 use web3::types::Address;
@@ -53,8 +48,9 @@ struct EncryptionKey {
 
 #[derive(Deserialize, Clone)]
 struct Message {
-    key: [u8; 32],
-    value: String,
+    ciphertext: String,
+    public_key: String,
+    nonce: String,
 }
 
 #[get("/encription_key")]
@@ -86,7 +82,7 @@ async fn register_contract(value: String) -> web3::contract::Result<()> {
 
     let accounts = web3.eth().accounts().await?;
 
-    let contract_addr = Address::from_str("5fbdb2315678afecb367f032d93f642f64180aa3").unwrap();
+    let contract_addr = Address::from_str("0x5fbdb2315678afecb367f032d93f642f64180aa3").unwrap();
     let contract = Contract::from_json(
         web3.eth(),
         contract_addr,
@@ -106,15 +102,49 @@ async fn register_contract(value: String) -> web3::contract::Result<()> {
 }
 
 #[post("/messages")]
-async fn post_messages(msg: web::Json<Message>, _enclave: web::Data<Enclave>) -> impl Responder {
-    let result = register_contract(msg.value.clone()).await;
+async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> impl Responder {
+    let mut retval = sgx_status_t::SGX_SUCCESS;
+    let nonce = msg.nonce.as_bytes();
+    let b_pubkey = msg.public_key.as_bytes();
+    let ciphertext = msg.ciphertext.as_bytes();
+
+    print!("nonce: {}", msg.nonce);
+    print!("key: {}", msg.public_key);
+    print!("text: {}", msg.ciphertext);
+
+    let result = unsafe {
+        ecall_decrypt(
+            enclave.eid,
+            &mut retval,
+            nonce.as_ptr(),
+            nonce.len(),
+            b_pubkey.as_ptr(),
+            b_pubkey.len(),
+            ciphertext.as_ptr(),
+            ciphertext.len(),
+        )
+    };
+
+    if result != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", result.as_str());
+        return HttpResponse::BadRequest().json(ResponseBody {
+            message: result.as_str().to_string(),
+        });
+    }
+    if retval != sgx_status_t::SGX_SUCCESS {
+        println!("[-] ECALL Enclave Failed {}!", retval.as_str());
+        return HttpResponse::BadRequest().json(ResponseBody {
+            message: retval.as_str().to_string(),
+        });
+    }
+
+    // Register value into blockchain
+    let result = register_contract(msg.ciphertext.clone()).await;
 
     match result {
         Ok(posts) => HttpResponse::Created().json(posts),
         _ => HttpResponse::BadRequest().body("failed to register contract"),
     }
-
-    HttpResponse::Created().json("created")
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
@@ -136,7 +166,7 @@ fn init_enclave() -> SgxResult<SgxEnclave> {
     )
 }
 
-#[tokio::main]
+#[actix_web::main]
 async fn main() -> Result<()> {
     let enclave = match init_enclave() {
         Ok(r) => {
@@ -150,13 +180,14 @@ async fn main() -> Result<()> {
     };
 
     let eid = enclave.geteid();
+
     HttpServer::new(move || {
         App::new()
             .data(Enclave { eid: eid })
             .service(get_encription_key)
             .service(post_messages)
     })
-    .bind(":8080")?
+    .bind("127.0.0.1:8080")?
     .run()
     .await?;
 
