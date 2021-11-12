@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nonce = crypto_box::generate_nonce(&mut rng);
 
     // encrypts the plaintext
-    let plaintext = "hello, Bob!";
+    let plaintext = "Hello, Bob!";
     let ciphertext = ChaChaBox::new(&server_public_key, &secret_key)
         .encrypt(
             &nonce,
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect::<String>(),
     };
 
-    println!("body: {:?}", body);
+    println!("body: {:#?}", body);
 
     let client = reqwest::blocking::Client::new();
     let resp = client

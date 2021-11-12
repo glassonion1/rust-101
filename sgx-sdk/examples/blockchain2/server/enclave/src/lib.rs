@@ -35,8 +35,8 @@ pub extern "C" fn ecall_get_encryption_key(
     let secret_key = SecretKey::from(rnd);
     let public_key = secret_key.public_key();
 
-    println!("Bob's secret key: {:?}", secret_key);
-    println!("Bob's public key: {:?}", public_key);
+    println!("Server secret key: {:?}", secret_key);
+    println!("Server public key: {:?}", public_key);
 
     SECRET_KEY.set(secret_key.to_bytes()).unwrap();
 
@@ -64,16 +64,16 @@ pub extern "C" fn ecall_decrypt(
     let mut pubkey_slice = unsafe { slice::from_raw_parts(in_pubkey, in_pubkey_len) };
     let mut buf = [0; KEY_SIZE];
     pubkey_slice.read_exact(&mut buf).unwrap();
-    let alice_public_key = PublicKey::from(buf);
+    let client_public_key = PublicKey::from(buf);
 
     let ciphertext = unsafe { slice::from_raw_parts(in_ciphertext, in_ciphertext_len) };
 
     // secret key
-    let b = SECRET_KEY.get().unwrap();
-    let bob_secret_key = SecretKey::from(*b);
+    let secret_key_byte = SECRET_KEY.get().unwrap();
+    let server_secret_key = SecretKey::from(*secret_key_byte);
 
     // decrypts the cipertext
-    let decrypted = ChaChaBox::new(&alice_public_key, &bob_secret_key)
+    let decrypted = ChaChaBox::new(&client_public_key, &server_secret_key)
         .decrypt(
             &nonce,
             Payload {

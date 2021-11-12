@@ -91,7 +91,7 @@ async fn register_contract(value: String) -> web3::contract::Result<()> {
     .unwrap();
 
     let value = format!("{:?}", &value);
-    println!("{}", value.clone());
+    println!("value: {}", value.clone());
 
     let tx = contract
         .call("addValue", (value,), accounts[0], Options::default())
@@ -103,16 +103,10 @@ async fn register_contract(value: String) -> web3::contract::Result<()> {
 
 #[post("/messages")]
 async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> impl Responder {
-    /*
     let mut retval = sgx_status_t::SGX_SUCCESS;
-    let nonce = msg.nonce.as_bytes();
-    let b_pubkey = msg.public_key.as_bytes();
-    let ciphertext = msg.ciphertext.as_bytes();
-
-    print!("nonce: {}", msg.nonce);
-    print!("key: {}", msg.public_key);
-    print!("text: {}", msg.ciphertext);
-    print!("eid: {}", enclave.eid);
+    let nonce = hex::decode(&msg.nonce).expect("Decoding failed");
+    let pubkey = hex::decode(&msg.public_key).expect("Decoding failed");
+    let ciphertext = hex::decode(&msg.ciphertext).expect("Decoding failed");
 
     let result = unsafe {
         ecall_decrypt(
@@ -120,8 +114,8 @@ async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> 
             &mut retval,
             nonce.as_ptr(),
             nonce.len(),
-            b_pubkey.as_ptr(),
-            b_pubkey.len(),
+            pubkey.as_ptr(),
+            pubkey.len(),
             ciphertext.as_ptr(),
             ciphertext.len(),
         )
@@ -140,8 +134,6 @@ async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> 
         });
     }
 
-    */
-
     // Register value into blockchain
     let result = register_contract(msg.ciphertext.clone()).await;
 
@@ -149,7 +141,6 @@ async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> 
         Ok(posts) => HttpResponse::Created().json(posts),
         _ => HttpResponse::BadRequest().body("failed to register contract"),
     }
-    //HttpResponse::Created().body("test")
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
@@ -185,10 +176,11 @@ async fn main() -> Result<()> {
     };
 
     let eid = enclave.geteid();
+    let data = Enclave { eid: eid };
 
     HttpServer::new(move || {
         App::new()
-            .data(Enclave { eid: eid })
+            .data(data.clone())
             .service(get_encription_key)
             .service(post_messages)
     })
@@ -196,7 +188,7 @@ async fn main() -> Result<()> {
     .run()
     .await?;
 
-    println!("[+] crypto_box success...");
+    println!("[+] blockchain success...");
     enclave.destroy();
 
     Ok(())
