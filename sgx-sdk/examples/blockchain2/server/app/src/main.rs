@@ -82,7 +82,7 @@ async fn register_contract(value: String) -> web3::contract::Result<()> {
 
     let accounts = web3.eth().accounts().await?;
 
-    let contract_addr = Address::from_str("0x5fbdb2315678afecb367f032d93f642f64180aa3").unwrap();
+    let contract_addr = Address::from_str("5fbdb2315678afecb367f032d93f642f64180aa3").unwrap();
     let contract = Contract::from_json(
         web3.eth(),
         contract_addr,
@@ -103,6 +103,7 @@ async fn register_contract(value: String) -> web3::contract::Result<()> {
 
 #[post("/messages")]
 async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> impl Responder {
+    /*
     let mut retval = sgx_status_t::SGX_SUCCESS;
     let nonce = msg.nonce.as_bytes();
     let b_pubkey = msg.public_key.as_bytes();
@@ -111,6 +112,7 @@ async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> 
     print!("nonce: {}", msg.nonce);
     print!("key: {}", msg.public_key);
     print!("text: {}", msg.ciphertext);
+    print!("eid: {}", enclave.eid);
 
     let result = unsafe {
         ecall_decrypt(
@@ -138,6 +140,8 @@ async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> 
         });
     }
 
+    */
+
     // Register value into blockchain
     let result = register_contract(msg.ciphertext.clone()).await;
 
@@ -145,6 +149,7 @@ async fn post_messages(msg: web::Json<Message>, enclave: web::Data<Enclave>) -> 
         Ok(posts) => HttpResponse::Created().json(posts),
         _ => HttpResponse::BadRequest().body("failed to register contract"),
     }
+    //HttpResponse::Created().body("test")
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
